@@ -36,16 +36,44 @@ const initDb = async () => {
       status VARCHAR(50), -- SUCCESS, FAILED
       user_agent TEXT
     );
+
+    CREATE TABLE IF NOT EXISTS users (
+      id SERIAL PRIMARY KEY,
+      username VARCHAR(255) UNIQUE NOT NULL,
+      password VARCHAR(255) NOT NULL, -- Storing as plain text for now as per user simplicity, but can upgrade to hash later
+      role VARCHAR(50) DEFAULT 'admin'
+    );
   `;
   try {
     await pool.query(query);
     console.log('Database initialized successfully.');
+    
+    // Seed default user if none exists
+    const userCheck = await pool.query('SELECT COUNT(*) FROM users');
+    if (parseInt(userCheck.rows[0].count) === 0) {
+      console.log('Seeding default administrator...');
+      await pool.query(
+        'INSERT INTO users (username, password, role) VALUES ($1, $2, $3)',
+        ['singhaanimesh216@gmail.com', 'YoForex@101', 'admin']
+      );
+    }
   } catch (err) {
     console.error('Failed to initialize database:', err);
   }
 };
 
 initDb();
+
+export const verifyUser = async (username: string, password: string) => {
+  const query = `SELECT * FROM users WHERE username = $1 AND password = $2`;
+  try {
+    const res = await pool.query(query, [username, password]);
+    return res.rows[0] || null;
+  } catch (err) {
+    console.error('Error verifying user:', err);
+    throw err;
+  }
+};
 
 export const saveAuthLog = async (log: { username: string, ip: string, status: string, userAgent?: string }) => {
   const query = `

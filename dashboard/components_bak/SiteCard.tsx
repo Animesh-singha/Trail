@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Activity, Cpu, Database, Globe, MemoryStick as Memory, Zap, MoreVertical, RefreshCw, Trash2, Download, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Activity, Cpu, Database, Globe, MemoryStick as Memory, Zap, MoreVertical, RefreshCw, Trash2 } from 'lucide-react';
 
 interface SiteCardProps {
   target: string;
@@ -14,10 +14,7 @@ export default function SiteCard({ target, vps, onClick }: SiteCardProps) {
   const [metrics, setMetrics] = useState<any>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [actionPending, setActionPending] = useState<string | null>(null);
-  const [backupStatus, setBackupStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const siteName = target.replace(/https?:\/\//, '');
-  // Derive a likely db_name from the site URL (e.g., yoforex.com -> yoforex_db)
-  const dbName = siteName.split('.')[0].replace(/-/g, '_') + '_db';
 
   useEffect(() => {
     const fetchMetrics = async () => {
@@ -51,31 +48,6 @@ export default function SiteCard({ target, vps, onClick }: SiteCardProps) {
     } finally {
       setActionPending(null);
     }
-  };
-
-  const handleBackup = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsMenuOpen(false);
-    setBackupStatus('loading');
-    try {
-      const res = await fetch('http://localhost:3001/v1/control/backup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target: dbName })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setBackupStatus('success');
-        alert(`✅ Backup successful!\nFile: ${data.file}\nSize: ${data.size}`);
-      } else {
-        setBackupStatus('error');
-        alert(`❌ Backup failed: ${data.error}`);
-      }
-    } catch {
-      setBackupStatus('error');
-      alert('❌ Backup failed: Network error or server offline.');
-    }
-    setTimeout(() => setBackupStatus('idle'), 5000);
   };
 
   return (
@@ -129,25 +101,6 @@ export default function SiteCard({ target, vps, onClick }: SiteCardProps) {
                        {actionPending === opt.id ? 'Processing' : opt.label}
                      </button>
                    ))}
-                   <div className="border-t border-slate-800/50 my-1" />
-                   <button
-                     disabled={backupStatus === 'loading'}
-                     onClick={handleBackup}
-                     className={`w-full px-4 py-2 text-left text-[9px] font-bold uppercase tracking-widest flex items-center gap-3 transition-colors disabled:opacity-50 ${
-                       backupStatus === 'success' ? 'text-emerald-400 bg-emerald-500/5' :
-                       backupStatus === 'error' ? 'text-rose-400 bg-rose-500/5' :
-                       'text-emerald-400 hover:bg-emerald-500/10'
-                     }`}
-                   >
-                     {backupStatus === 'loading' ? <div className="w-2.5 h-2.5 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" /> :
-                      backupStatus === 'success' ? <CheckCircle2 size={10} /> :
-                      backupStatus === 'error' ? <AlertCircle size={10} /> :
-                      <Download size={10} />}
-                     {backupStatus === 'loading' ? 'Backing Up...' :
-                      backupStatus === 'success' ? 'Backup Done!' :
-                      backupStatus === 'error' ? 'Backup Failed' :
-                      'Backup DB'}
-                   </button>
                 </div>
               )}
            </div>

@@ -1,5 +1,6 @@
 import { FastifyInstance } from 'fastify';
 import { executeServerAction } from '../services/control.service';
+import { executeDatabaseBackup } from '../services/backup.service';
 
 export const controlRoutes = async (server: FastifyInstance) => {
   server.post('/control/execute', async (request: any, reply) => {
@@ -18,6 +19,26 @@ export const controlRoutes = async (server: FastifyInstance) => {
     }
   });
 
+  server.post('/control/backup', async (request: any, reply) => {
+    const { target } = request.body;
+
+    if (!target) {
+      return reply.code(400).send({ error: 'Target identifier is required for backup naming constraint' });
+    }
+
+    try {
+      const result = await executeDatabaseBackup(target);
+      if (result.success) {
+        return reply.code(200).send(result);
+      } else {
+        return reply.code(500).send(result);
+      }
+    } catch (err: any) {
+      server.log.error(err);
+      return reply.code(500).send({ error: err.message });
+    }
+  });
+
   server.get('/control/history', async (request, reply) => {
     // In production, we'd fetch this from DB (audit logs)
     return [
@@ -25,3 +46,4 @@ export const controlRoutes = async (server: FastifyInstance) => {
     ];
   });
 };
+

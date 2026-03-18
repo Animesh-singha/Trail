@@ -18,12 +18,12 @@ dist/
 .DS_Store
 *.pem
 
-# Env (ALLOWED AS REQUESTED)
-# .env
-# .env.local
-# .env.development.local
-# .env.test.local
-# .env.production.local
+# Env files (PROTECTED - never commit API keys)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
 
 # Logs
 npm-debug.log*

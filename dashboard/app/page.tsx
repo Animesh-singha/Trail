@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  AlertTriangle, Activity, ShieldAlert, CheckCircle, ServerCrash, Server, X, Maximize2, 
-  LayoutDashboard, Server as ServerIcon, Globe, ShieldAlert as AlertIcon, 
+import {
+  AlertTriangle, Activity, ShieldAlert, CheckCircle, ServerCrash, Server, X, Maximize2,
+  LayoutDashboard, Server as ServerIcon, Globe, ShieldAlert as AlertIcon,
   Terminal, Share2, ShieldCheck, Share as ShareIcon, Shield, Eye, EyeOff
 } from 'lucide-react';
 
@@ -20,6 +20,8 @@ import MetricGraph from '@/components/MetricGraph';
 import CommandPalette from '@/components/CommandPalette';
 import AlertTimeline from '@/components/AlertTimeline';
 import RootCauseTimeline from '@/components/RootCauseTimeline';
+import BackupPanel from '@/components/BackupPanel';
+import SandboxSimulator from '@/components/SandboxSimulator';
 
 function InteractiveAuth({ onAuth }: { onAuth: () => void }) {
   const [username, setUsername] = useState('');
@@ -43,7 +45,7 @@ function InteractiveAuth({ onAuth }: { onAuth: () => void }) {
         if (res.ok) {
           const history = await res.json();
           // Transform history into terminal lines
-          const historyLines = history.reverse().map((log: any) => 
+          const historyLines = history.reverse().map((log: any) =>
             `> RECENT ATTEMPT: ${log.username} [${log.ip_address}] - ${log.status}`
           );
           setTerminalLines(prev => [...prev.slice(0, 4), ...historyLines, ...prev.slice(4)]);
@@ -58,14 +60,14 @@ function InteractiveAuth({ onAuth }: { onAuth: () => void }) {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (status === 'checking') return;
-    
+
     setStatus('checking');
     setTerminalLines(prev => [...prev.slice(-10), `> VERIFYING IDENTITY: ${username}...`]);
-    
+
     // Check against user provided credentials
     setTimeout(async () => {
       const isValid = (
-        (username === 'singhaanimesh216@gmail.com' && password === 'YoForex@101') || 
+        (username === 'singhaanimesh216@gmail.com' && password === 'YoForex@101') ||
         (username === 'singhaanimesh@gmail.com' && password === 'YoForex@101') ||
         (username === 'admin' && password === 'NexusSOC')
       );
@@ -101,8 +103,8 @@ function InteractiveAuth({ onAuth }: { onAuth: () => void }) {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,#4f46e5_0%,transparent_50%)]"></div>
         <div className="scan-line"></div>
       </div>
-      
-      <motion.div 
+
+      <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         className="w-full max-w-md bg-slate-900/50 border border-indigo-500/30 rounded-3xl p-8 backdrop-blur-2xl shadow-[0_0_50px_rgba(79,70,229,0.1)] relative"
@@ -111,9 +113,9 @@ function InteractiveAuth({ onAuth }: { onAuth: () => void }) {
           <div className="p-4 bg-indigo-500/10 rounded-2xl border border-indigo-500/20 text-indigo-400 relative">
             <ShieldAlert size={40} className={status === 'checking' ? 'animate-pulse' : ''} />
             {status === 'success' && (
-              <motion.div 
-                initial={{ scale: 0 }} 
-                animate={{ scale: 1 }} 
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
                 className="absolute -top-2 -right-2 bg-emerald-500 rounded-full p-1"
               >
                 <CheckCircle size={16} className="text-white" />
@@ -173,7 +175,7 @@ function InteractiveAuth({ onAuth }: { onAuth: () => void }) {
               </button>
             </div>
             {status === 'error' && (
-              <motion.p 
+              <motion.p
                 initial={{ opacity: 0, y: -5 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="text-[10px] text-rose-500 font-bold ml-1 mt-1"
@@ -216,6 +218,30 @@ export default function DashboardPage() {
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [timelineEvents, setTimelineEvents] = useState<any[]>([]);
   const [isTimelineLoading, setIsTimelineLoading] = useState(false);
+  const [timeRange, setTimeRange] = useState('24h');
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const [isSandboxOpen, setIsSandboxOpen] = useState(false);
+  const tabNavRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const el = tabNavRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width - 0.5) * 20;
+    const y = ((e.clientY - rect.top) / rect.height - 0.5) * -14;
+    setMousePos({ x, y });
+  };
+
+  const handleMouseLeave = () => setMousePos({ x: 0, y: 0 });
+
+  const filteredIncidents = incidents.filter(i => {
+    const ts = new Date(i.timestamp).getTime();
+    if (timeRange === '1h') return ts > Date.now() - 3600000;
+    if (timeRange === '5m') return ts > Date.now() - 300000;
+    if (timeRange === '24h') return ts > Date.now() - 86400000;
+    if (timeRange === '7d') return ts > Date.now() - 604800000;
+    return true;
+  });
 
   const handleExplainAI = async () => {
     if (!selectedIncident) return;
@@ -269,23 +295,23 @@ export default function DashboardPage() {
       try {
         const dummyStats = { total: 0, critical: 0, last24h: 0 };
         setStats(dummyStats);
-        
+
         // Fetch incidents from AI Analyzer
         const incRes = await fetch('http://localhost:3001/v1/incidents');
         if (incRes.ok) {
-           const incData = await incRes.json();
-           setIncidents(incData);
-           setStats({
-             total: incData.length,
-             critical: incData.filter((i: any) => i.severity === 'CRITICAL' && i.status !== 'RESOLVED').length,
-             last24h: incData.filter((i: any) => new Date(i.timestamp).getTime() > Date.now() - 86400000).length
-           });
+          const incData = await incRes.json();
+          setIncidents(incData);
+          setStats({
+            total: incData.length,
+            critical: incData.filter((i: any) => i.severity === 'CRITICAL' && i.status !== 'RESOLVED').length,
+            last24h: incData.filter((i: any) => new Date(i.timestamp).getTime() > Date.now() - 86400000).length
+          });
         }
 
         const statsRes = await fetch('http://localhost:3001/v1/incidents/stats');
         if (statsRes.ok) {
-           const statsData = await statsRes.json();
-           setAnalytics(statsData);
+          const statsData = await statsRes.json();
+          setAnalytics(statsData);
         }
 
         const res = await fetch('/api/metrics');
@@ -304,20 +330,20 @@ export default function DashboardPage() {
   }, []);
 
   const handleStatusUpdate = async (id: number, status: string) => {
-     try {
-        const res = await fetch(`http://localhost:3001/v1/incidents/${id}`, {
-           method: 'PATCH',
-           headers: { 'Content-Type': 'application/json' },
-           body: JSON.stringify({ status })
-        });
-        if (res.ok) {
-           // Refresh UI
-           const updated = await res.json();
-           setIncidents((prev: any[]) => prev.map((i: any) => i.id === id ? updated : i));
-        }
-     } catch (err) {
-        console.error('Failed to update incident status', err);
-     }
+    try {
+      const res = await fetch(`http://localhost:3001/v1/incidents/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      if (res.ok) {
+        // Refresh UI
+        const updated = await res.json();
+        setIncidents((prev: any[]) => prev.map((i: any) => i.id === id ? updated : i));
+      }
+    } catch (err) {
+      console.error('Failed to update incident status', err);
+    }
   };
 
   const healthScore = Math.max(0, 100 - (Number(stats.critical) * 10) - (incidents.filter((i: any) => i.status === 'OPEN').length * 2));
@@ -340,7 +366,7 @@ export default function DashboardPage() {
   ];
 
   if (!isAuthenticated && !loading) {
-     return <InteractiveAuth onAuth={() => setIsAuthenticated(true)} />;
+    return <InteractiveAuth onAuth={() => setIsAuthenticated(true)} />;
   }
 
   return (
@@ -349,631 +375,752 @@ export default function DashboardPage() {
       <div className="bg-slate-950/80 border-b border-slate-800/50 backdrop-blur-xl sticky top-0 z-[60] py-3 px-8 shadow-2xl">
         <div className="max-w-[1600px] mx-auto flex justify-between items-center sm:gap-6 gap-3">
           <div className="flex flex-wrap items-center gap-3 sm:gap-6">
-             <div className="group flex flex-col cursor-help">
-                <span className="text-[9px] sm:text-[10px] text-slate-500 font-black uppercase tracking-widest group-hover:text-indigo-400 transition-colors">Fleet Nodes</span>
-                <div className="flex items-center gap-2">
-                   <span className="text-base sm:text-lg font-black text-white">{servers.filter(s => s.status === 'online').length}</span>
-                   <span className="text-[9px] sm:text-[10px] text-emerald-400 font-bold">READY</span>
-                </div>
-             </div>
-             <div className="w-px h-6 bg-slate-800 hidden sm:block"></div>
-             <div className="group flex flex-col cursor-help">
-                <span className="text-[9px] sm:text-[10px] text-slate-500 font-black uppercase tracking-widest group-hover:text-indigo-400 transition-colors">Active Assets</span>
-                <div className="flex items-center gap-2">
-                   <span className="text-base sm:text-lg font-black text-white">{monitoredSites.length}</span>
-                   <span className="text-[9px] sm:text-[10px] text-indigo-400 font-bold">LIVE</span>
-                </div>
-             </div>
-             <div className="w-px h-6 bg-slate-800 hidden sm:block"></div>
-             <div className="group flex flex-col cursor-help">
-                <span className="text-[9px] sm:text-[10px] text-slate-500 font-black uppercase tracking-widest group-hover:text-rose-400 transition-colors">Open Incidents</span>
-                <div className="flex items-center gap-2">
-                   <span className="text-base sm:text-lg font-black text-rose-500">{incidents.filter(i => i.status === 'OPEN').length}</span>
-                   <span className="text-[9px] sm:text-[10px] text-rose-400 font-bold animate-pulse">ATTN</span>
-                </div>
-             </div>
+            <div className="group flex flex-col cursor-help">
+              <span className="text-[9px] sm:text-[10px] text-slate-500 font-black uppercase tracking-widest group-hover:text-indigo-400 transition-colors">Fleet Nodes</span>
+              <div className="flex items-center gap-2">
+                <span className="text-base sm:text-lg font-black text-white">{servers.filter(s => s.status === 'online').length}</span>
+                <span className="text-[9px] sm:text-[10px] text-emerald-400 font-bold">READY</span>
+              </div>
+            </div>
+            <div className="w-px h-6 bg-slate-800 hidden sm:block"></div>
+            <div className="group flex flex-col cursor-help">
+              <span className="text-[9px] sm:text-[10px] text-slate-500 font-black uppercase tracking-widest group-hover:text-indigo-400 transition-colors">Active Assets</span>
+              <div className="flex items-center gap-2">
+                <span className="text-base sm:text-lg font-black text-white">{monitoredSites.length}</span>
+                <span className="text-[9px] sm:text-[10px] text-indigo-400 font-bold">LIVE</span>
+              </div>
+            </div>
+            <div className="w-px h-6 bg-slate-800 hidden sm:block"></div>
+            <div className="group flex flex-col cursor-help">
+              <span className="text-[9px] sm:text-[10px] text-slate-500 font-black uppercase tracking-widest group-hover:text-rose-400 transition-colors">Open Incidents</span>
+              <div className="flex items-center gap-2">
+                <span className="text-base sm:text-lg font-black text-rose-500">{incidents.filter(i => i.status === 'OPEN').length}</span>
+                <span className="text-[9px] sm:text-[10px] text-rose-400 font-bold animate-pulse">ATTN</span>
+              </div>
+            </div>
           </div>
 
           <div className="flex items-center gap-4">
-             <div className="hidden lg:flex flex-col items-end mr-4">
-                <span className="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-1">Cyber Threat Assessment</span>
-                <div className="h-1.5 w-32 bg-slate-800 rounded-full overflow-hidden">
-                   <motion.div 
-                     animate={{ width: `${Math.min(100, (incidents.length * 15))}%` }}
-                     className={`h-full ${incidents.length > 3 ? 'bg-rose-500 shadow-[0_0_8px_#f43f5e]' : 'bg-emerald-500 shadow-[0_0_8px_#10b981]'}`}
-                   ></motion.div>
-                </div>
-             </div>
-             
-             <button className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-lg text-[9px] font-black text-slate-400 hover:text-white transition-all group">
-                <kbd className="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-500 group-hover:text-white group-hover:border-indigo-500 transition-colors">Ctrl + K</kbd>
-                COMMAND CENTER
-             </button>
+            <div className="hidden lg:flex flex-col items-end mr-4">
+              <span className="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-1">Cyber Threat Assessment</span>
+              <div className="h-1.5 w-32 bg-slate-800 rounded-full overflow-hidden">
+                <motion.div
+                  animate={{ width: `${Math.min(100, (incidents.length * 15))}%` }}
+                  className={`h-full ${incidents.length > 3 ? 'bg-rose-500 shadow-[0_0_8px_#f43f5e]' : 'bg-emerald-500 shadow-[0_0_8px_#10b981]'}`}
+                ></motion.div>
+              </div>
+            </div>
 
-             <select className="bg-slate-900 border border-slate-800 rounded-lg px-3 py-1 text-[10px] font-bold text-indigo-400 focus:ring-1 focus:ring-indigo-500 outline-none">
-                <option>Last 1 Hour</option>
-                <option>Last 5 Minutes</option>
-                <option>Last 24 Hours</option>
-                <option>Last 7 Days</option>
-             </select>
+            <button className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-lg text-[9px] font-black text-slate-400 hover:text-white transition-all group">
+              <kbd className="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-500 group-hover:text-white group-hover:border-indigo-500 transition-colors">Ctrl + K</kbd>
+              COMMAND CENTER
+            </button>
+
+            <select
+              value={timeRange}
+              onChange={(e) => setTimeRange(e.target.value)}
+              className="bg-slate-900 border border-slate-800 rounded-lg px-3 py-1 text-[10px] font-bold text-indigo-400 focus:ring-1 focus:ring-indigo-500 outline-none"
+            >
+              <option value="1h">Last 1 Hour</option>
+              <option value="5m">Last 5 Minutes</option>
+              <option value="24h">Last 24 Hours</option>
+              <option value="7d">Last 7 Days</option>
+            </select>
           </div>
         </div>
       </div>
 
-    <main className="min-h-screen glow-mesh text-slate-100 selection:bg-indigo-500/30">
-      <div className="p-4 md:p-8 max-w-7xl mx-auto relative z-10">
-      
-      {/* Premium Header */}
-      <motion.header 
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col md:flex-row justify-between items-start md:items-end border-b border-slate-700/50 pb-6 mb-8 gap-4"
-      >
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-indigo-500/10 rounded-xl border border-indigo-500/20">
-              <ShieldAlert className="text-indigo-400" size={28} />
+      <main className="min-h-screen glow-mesh text-slate-100 selection:bg-indigo-500/30">
+        <div className="p-4 md:p-8 max-w-7xl mx-auto relative z-10">
+
+          {/* Premium Header */}
+          <motion.header
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="border-b border-slate-700/50 pb-6 mb-8"
+          >
+            {/* Top Row: Title + Sandbox badge */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-5">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-indigo-500/10 rounded-xl border border-indigo-500/20">
+                  <ShieldAlert className="text-indigo-400" size={28} />
+                </div>
+                <div>
+                  <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
+                    Nexus SOC Module
+                  </h1>
+                  <p className="text-slate-400 text-sm md:text-base ml-0.5 mt-0.5">Autonomous monitoring platform with AI incident resolution.</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsSandboxOpen(true)}
+                className="px-3 py-1 bg-indigo-500/10 hover:bg-indigo-500/20 active:scale-95 transition-all border border-indigo-500/30 text-[9px] font-black uppercase tracking-widest rounded-full text-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.2)] shrink-0 cursor-pointer flex items-center gap-2 relative z-50"
+              >
+                <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-pulse"></span>
+                Sandbox Mode Active
+              </button>
             </div>
-            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-400">
-               Nexus SOC Module
-            </h1>
-          </div>
-          <p className="text-slate-400 text-sm md:text-base ml-1">Autonomous monitoring platform with AI incident resolution.</p>
-          <div className="flex items-center gap-4 mt-2">
-             <UptimeMonitor onTargetsUpdate={() => {}} />
-             <div className="px-3 py-1 bg-indigo-500 text-[8px] font-black uppercase tracking-tighter rounded-full opacity-80">Sandbox Mode Active</div>
-          </div>
-        </div>
-        
-        {/* Navigation Tabs */}
-        <div className="bg-slate-900/50 p-1.5 rounded-2xl border border-slate-800 flex flex-wrap gap-1 shadow-inner w-full md:w-auto">
-           {tabs.map(tab => (
-             <button
-               key={tab.id}
-               onClick={() => setActiveTab(tab.id as any)}
-               className={`flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-[10px] sm:text-xs font-bold transition-all flex-1 md:flex-initial ${activeTab === tab.id ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}
-             >
-               <tab.icon size={14} />
-               <span className="hidden sm:inline">{tab.label}</span>
-             </button>
-           ))}
-        </div>
-      </motion.header>
 
-      {/* Main Content Area */}
-      <AnimatePresence mode="wait">
-        <motion.div
-           key={activeTab}
-           initial={{ opacity: 0, y: 10 }}
-           animate={{ opacity: 1, y: 0 }}
-           exit={{ opacity: 0, y: -10 }}
-           transition={{ duration: 0.2 }}
-        >
-          {/* 1. OVERVIEW SECTION */}
-          {activeTab === 'overview' && (
-            <section>
-              <h2 className="text-2xl font-bold mb-6 flex items-center gap-3 text-indigo-100 uppercase tracking-tight">
-                <LayoutDashboard className="text-indigo-500" /> Fleet Intelligence Overview
-              </h2>
-              <FleetOverview websites={monitoredSites} servers={servers} securityScore={healthScore} />
-              
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-                 <div className="space-y-6">
-                    <h3 className="text-lg font-bold flex items-center gap-2 mb-4"><Activity size={18} className="text-emerald-400"/> System Health Status</h3>
-                    <div className="glass-panel p-6 rounded-2xl">
-                       <div className="flex justify-between items-center mb-6">
-                         <span className="text-sm font-bold text-slate-300">Global Uptime Aggregate</span>
-                         <span className="text-emerald-400 font-black">99.98%</span>
-                       </div>
-                       <div className="h-2 bg-slate-800 rounded-full overflow-hidden mb-8">
-                         <div className="h-full w-[99.9%] bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]"></div>
-                       </div>
-                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Middle Row: Uptime Monitor Pills */}
+            <div className="mb-5">
+              <UptimeMonitor onTargetsUpdate={() => { }} />
+            </div>
+
+            {/* Bottom Row: Navigation Tabs */}
+            <div className="bg-slate-900/50 p-1.5 rounded-2xl border border-slate-800 flex flex-wrap gap-1 shadow-inner w-full">
+              {tabs.map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  className={`flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-[10px] sm:text-xs font-bold transition-all flex-1 md:flex-initial ${activeTab === tab.id ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}
+                >
+                  <tab.icon size={14} />
+                  <span className="hidden sm:inline">{tab.label}</span>
+                </button>
+              ))}
+            </div>
+          </motion.header>
+
+          {/* Main Content Area */}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2 }}
+            >
+              {/* 1. OVERVIEW SECTION */}
+              {activeTab === 'overview' && (
+                <section>
+                  <h2 className="text-2xl font-bold mb-6 flex items-center gap-3 text-indigo-100 uppercase tracking-tight">
+                    <LayoutDashboard className="text-indigo-500" /> Fleet Intelligence Overview
+                  </h2>
+                  <FleetOverview websites={monitoredSites} servers={servers} securityScore={healthScore} />
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+                    <div className="space-y-6">
+                      <h3 className="text-lg font-bold flex items-center gap-2 mb-4"><Activity size={18} className="text-emerald-400" /> System Health Status</h3>
+                      <div className="glass-panel p-6 rounded-2xl">
+                        <div className="flex justify-between items-center mb-6">
+                          <span className="text-sm font-bold text-slate-300">Global Uptime Aggregate</span>
+                          <span className="text-emerald-400 font-black">99.98%</span>
+                        </div>
+                        <div className="h-2 bg-slate-800 rounded-full overflow-hidden mb-8">
+                          <div className="h-full w-[99.9%] bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]"></div>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                           <div className="p-4 bg-slate-900/60 rounded-xl border border-slate-800/50 text-center">
-                             <div className="text-2xl font-black text-rose-500">{stats.critical}</div>
-                             <div className="text-[10px] text-slate-500 uppercase font-bold tracking-widest mt-1">Active Alerts</div>
+                            <div className="text-2xl font-black text-rose-500">{stats.critical}</div>
+                            <div className="text-[10px] text-slate-500 uppercase font-bold tracking-widest mt-1">Active Alerts</div>
                           </div>
                           <div className="p-4 bg-slate-900/60 rounded-xl border border-slate-800/50 text-center">
-                             <div className="text-2xl font-black text-indigo-400">{monitoredSites.length}</div>
-                             <div className="text-[10px] text-slate-500 uppercase font-bold tracking-widest mt-1">Live Targets</div>
+                            <div className="text-2xl font-black text-indigo-400">{monitoredSites.length}</div>
+                            <div className="text-[10px] text-slate-500 uppercase font-bold tracking-widest mt-1">Live Targets</div>
                           </div>
-                       </div>
+                        </div>
+                      </div>
                     </div>
-                 </div>
-                 
-                  <div>
-                     <AlertTimeline incidents={incidents} />
-                  </div>
-               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                  <MetricGraph 
-                    label="Fleet Avg CPU" 
-                    data={[12, 15, 22, 18, 25, 30, 28, 35, 42, 38, 32, 28, 24, 20]} 
-                    color="indigo" 
-                    unit="%" 
-                  />
-                  <MetricGraph 
-                    label="Network Ingress" 
-                    data={[102, 115, 122, 118, 225, 330, 228, 235, 442, 338, 332, 228, 224, 220]} 
-                    color="emerald" 
-                    unit="mb/s" 
-                  />
-                  <div className="glass-panel p-6 rounded-2xl flex flex-col justify-center">
-                     <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Fleet Regional Distribution</div>
-                     <div className="space-y-4">
+                    <div>
+                      <AlertTimeline incidents={incidents} />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <MetricGraph
+                      label="Fleet Avg CPU"
+                      data={[12, 15, 22, 18, 25, 30, 28, 35, 42, 38, 32, 28, 24, 20]}
+                      color="indigo"
+                      unit="%"
+                    />
+                    <MetricGraph
+                      label="Network Ingress"
+                      data={[102, 115, 122, 118, 225, 330, 228, 235, 442, 338, 332, 228, 224, 220]}
+                      color="emerald"
+                      unit="mb/s"
+                    />
+                    <div className="glass-panel p-6 rounded-2xl flex flex-col justify-center">
+                      <div className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-4">Fleet Regional Distribution</div>
+                      <div className="space-y-4">
                         {[
                           { region: 'Europe (FRA)', count: 2, status: 'Active' },
                           { region: 'US East (NYC)', count: 1, status: 'Active' },
                           { region: 'Asia (SIN)', count: 0, status: 'Provisioning' }
                         ].map(reg => (
                           <div key={reg.region} className="flex justify-between items-center bg-slate-900/40 p-3 rounded-lg border border-slate-800/30">
-                             <span className="text-[10px] font-bold text-slate-300">{reg.region}</span>
-                             <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${reg.count > 0 ? 'bg-indigo-500/20 text-indigo-400' : 'bg-slate-800 text-slate-500'}`}>
-                                {reg.count} NODES
-                             </span>
+                            <span className="text-[10px] font-bold text-slate-300">{reg.region}</span>
+                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${reg.count > 0 ? 'bg-indigo-500/20 text-indigo-400' : 'bg-slate-800 text-slate-500'}`}>
+                              {reg.count} NODES
+                            </span>
                           </div>
                         ))}
-                     </div>
+                      </div>
+                    </div>
                   </div>
-               </div>
-            </section>
-          )}
+                </section>
+              )}
 
-          {/* 2. INFRASTRUCTURE SECTION */}
-          {activeTab === 'infra' && (
-            <section>
-              <h2 className="text-2xl font-bold mb-6 flex items-center gap-3 text-indigo-100 uppercase tracking-tight">
-                <ServerIcon className="text-indigo-500" /> Infrastructure Nodes
-              </h2>
-              <ServerGrid />
-            </section>
-          )}
+              {/* 2. INFRASTRUCTURE SECTION */}
+              {activeTab === 'infra' && (
+                <section>
+                  <h2 className="text-2xl font-bold mb-6 flex items-center gap-3 text-indigo-100 uppercase tracking-tight">
+                    <ServerIcon className="text-indigo-500" /> Infrastructure Nodes
+                  </h2>
+                  <ServerGrid />
+                </section>
+              )}
 
-          {/* 3. WEB ASSETS SECTION */}
-          {activeTab === 'sites' && (
-            <section className="space-y-12">
-              <h2 className="text-2xl font-bold mb-2 flex items-center gap-3 text-indigo-100 uppercase tracking-tight">
-                <Globe className="text-indigo-500" /> Global Web Assets
-              </h2>
-              <p className="text-slate-500 text-sm mb-8">Management grid for application clusters distributed across nodes.</p>
-              
-              {Object.keys(sitesByVps).map((vpsName, vIdx) => (
-                <div key={vpsName} className="space-y-6">
-                  <div className="flex items-center gap-4">
-                     <h2 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] bg-indigo-500/5 px-4 py-1.5 rounded-full border border-indigo-500/20 flex items-center gap-2">
-                       <ServerIcon size={10} /> {vpsName} FLEET
-                     </h2>
-                     <div className="h-px flex-1 bg-slate-800/50"></div>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {sitesByVps[vpsName].map((site: any) => (
-                      <SiteCard 
-                        key={site.target}
-                        target={site.target}
-                        vps={vpsName}
-                        onClick={() => setSelectedSite(site)}
-                      />
+              {/* 3. WEB ASSETS SECTION */}
+              {activeTab === 'sites' && (
+                <section className="space-y-12">
+                  <div>
+                    <h2 className="text-2xl font-bold mb-2 flex items-center gap-3 text-indigo-100 uppercase tracking-tight">
+                      <Globe className="text-indigo-500" /> Live Site Health Monitor
+                    </h2>
+                    <p className="text-slate-500 text-sm mb-8">Click the <strong>⋮ menu</strong> on any card to Restart, Reload, or take a Database Backup independently.</p>
+
+                    {Object.keys(sitesByVps).map((vpsName, vIdx) => (
+                      <div key={vpsName} className="space-y-6 mb-10">
+                        <div className="flex items-center gap-4">
+                          <h2 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] bg-indigo-500/5 px-4 py-1.5 rounded-full border border-indigo-500/20 flex items-center gap-2">
+                            <ServerIcon size={10} /> {vpsName} FLEET
+                          </h2>
+                          <div className="h-px flex-1 bg-slate-800/50"></div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                          {sitesByVps[vpsName].map((site: any) => (
+                            <SiteCard
+                              key={site.target}
+                              target={site.target}
+                              vps={vpsName}
+                              onClick={() => setSelectedSite(site)}
+                            />
+                          ))}
+                        </div>
+                      </div>
                     ))}
                   </div>
-                </div>
-              ))}
-            </section>
-          )}
+                </section>
+              )}
 
-          {/* 4. TOPOLOGY MAP SECTION */}
-          {activeTab === 'map' && (
-            <section>
-              <h2 className="text-2xl font-bold mb-6 flex items-center gap-3 text-indigo-100 uppercase tracking-tight">
-                <Share2 className="text-indigo-500" /> Infrastructure Dependency Web
-              </h2>
-              <InfrastructureTopology />
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
-                 <div className="bg-slate-900/40 p-5 rounded-2xl border border-slate-800/50">
-                    <div className="text-[10px] text-indigo-400 font-bold mb-2 uppercase">Traffic Flow Analysis</div>
-                    <p className="text-xs text-slate-400">Current ingress distributed evenly across 3 primary load balancer nodes with 42ms overhead.</p>
-                 </div>
-                 <div className="bg-slate-900/40 p-5 rounded-2xl border border-slate-800/50">
-                    <div className="text-[10px] text-emerald-400 font-bold mb-2 uppercase">Core Redundancy</div>
-                    <p className="text-xs text-slate-400">Database cluster at 100% health. Replication lag at 2ms. Failover ready in secondary region.</p>
-                 </div>
-                 <div className="bg-slate-900/40 p-5 rounded-2xl border border-slate-800/50">
-                    <div className="text-[10px] text-rose-400 font-bold mb-2 uppercase">Security Perimeter</div>
-                    <p className="text-xs text-slate-400">Threat assessment at 0/100. No active bypass attempts detected in global firewall logs.</p>
-                 </div>
-              </div>
-            </section>
-          )}
+              {/* 4. TOPOLOGY MAP SECTION */}
+              {activeTab === 'map' && (
+                <section>
+                  <h2 className="text-2xl font-bold mb-6 flex items-center gap-3 text-indigo-100 uppercase tracking-tight">
+                    <Share2 className="text-indigo-500" /> Infrastructure Dependency Web
+                  </h2>
+                  <InfrastructureTopology incidents={filteredIncidents} />
 
-          {/* 5. LIVE ERRORS SECTION */}
-          {activeTab === 'errors' && (
-            <section>
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold flex items-center gap-3 text-rose-100 uppercase tracking-tight">
-                  <Terminal className="text-rose-500" /> Critical Error Feed
-                </h2>
-                <div className="text-[10px] text-slate-500 font-mono">Consolidated Global Logs</div>
-              </div>
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                 <div className="lg:col-span-2">
-                    <ErrorStream />
-                 </div>
-                 <div className="space-y-6">
-                    <div className="glass-panel p-6 rounded-2xl bg-rose-500/5 border-rose-500/20">
-                       <h3 className="text-sm font-bold text-rose-300 mb-4 flex items-center gap-2 underline underline-offset-4 decoration-rose-500/30">Immediate Actions</h3>
-                       <ul className="space-y-4">
-                          <li className="flex gap-3 text-xs leading-relaxed text-slate-300">
-                             <span className="w-1.5 h-1.5 bg-rose-500 rounded-full mt-1 shrink-0"></span>
-                             Check VPS resource saturation if high error rates persist.
-                          </li>
-                          <li className="flex gap-3 text-xs leading-relaxed text-slate-300">
-                             <span className="w-1.5 h-1.5 bg-rose-500 rounded-full mt-1 shrink-0"></span>
-                             Validate SSL/TLS certificates for targets showing "Handshake Failure".
-                          </li>
-                       </ul>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
+                    <div className="bg-slate-900/40 p-5 rounded-2xl border border-slate-800/50">
+                      <div className="text-[10px] text-indigo-400 font-bold mb-2 uppercase">Traffic Flow Analysis</div>
+                      <p className="text-xs text-slate-400">Current ingress distributed evenly across 3 primary load balancer nodes with 42ms overhead.</p>
                     </div>
-                    <button 
-                      onClick={() => {
-                        // Logic to trigger AI analysis of current error stream
-                        alert('Triggering AI Global Analysis...');
-                      }}
-                      className="w-full py-4 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-black text-xs uppercase tracking-widest rounded-2xl border border-rose-500/30 transition-all flex items-center justify-center gap-3 group"
-                    >
-                       <Activity size={16} className="group-hover:animate-pulse"/> Run AI Diagnostic
-                    </button>
-                 </div>
-              </div>
-            </section>
-          )}
+                    <div className="bg-slate-900/40 p-5 rounded-2xl border border-slate-800/50">
+                      <div className="text-[10px] text-emerald-400 font-bold mb-2 uppercase">Core Redundancy</div>
+                      <p className="text-xs text-slate-400">Database cluster at 100% health. Replication lag at 2ms. Failover ready in secondary region.</p>
+                    </div>
+                    <div className="bg-slate-900/40 p-5 rounded-2xl border border-slate-800/50">
+                      <div className="text-[10px] text-rose-400 font-bold mb-2 uppercase">Security Perimeter</div>
+                      <p className="text-xs text-slate-400">Threat assessment at 0/100. No active bypass attempts detected in global firewall logs.</p>
+                    </div>
+                  </div>
+                </section>
+              )}
 
-          {/* 6. INCIDENT MANAGEMENT SECTION */}
-          {activeTab === 'incidents' && (
-            <section>
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold flex items-center gap-3 text-indigo-100 uppercase tracking-tight">
-                  <AlertIcon className="text-indigo-500" /> Incident Command Center
-                </h2>
-                <div className="flex gap-4">
-                   <div className="text-[10px] text-slate-500 font-mono flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-rose-500"></span> {incidents.filter(i => i.status === 'OPEN').length} OPEN
-                   </div>
-                   <div className="text-[10px] text-slate-500 font-mono flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-amber-500"></span> {incidents.filter(i => i.status === 'INVESTIGATING').length} INVESTIGATING
-                   </div>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-                 <div className="lg:col-span-3 space-y-6">
-                    {incidents.length === 0 ? (
-                      <div className="glass-panel p-20 text-center opacity-50 flex flex-col items-center">
-                         <CheckCircle size={48} className="text-emerald-500 mb-4" />
-                         <p className="text-xl font-bold uppercase tracking-widest">No Active Incidents</p>
+              {/* 5. LIVE ERRORS SECTION */}
+              {activeTab === 'errors' && (
+                <section>
+                  <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-2xl font-bold flex items-center gap-3 text-rose-100 uppercase tracking-tight">
+                      <Terminal className="text-rose-500" /> Critical Error Feed
+                    </h2>
+                    <div className="text-[10px] text-slate-500 font-mono">Consolidated Global Logs</div>
+                  </div>
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div className="lg:col-span-2">
+                      <ErrorStream />
+                    </div>
+                    <div className="space-y-6">
+                      <div className="glass-panel p-6 rounded-2xl bg-rose-500/5 border-rose-500/20">
+                        <h3 className="text-sm font-bold text-rose-300 mb-4 flex items-center gap-2 underline underline-offset-4 decoration-rose-500/30">Immediate Actions</h3>
+                        <ul className="space-y-4">
+                          <li className="flex gap-3 text-xs leading-relaxed text-slate-300">
+                            <span className="w-1.5 h-1.5 bg-rose-500 rounded-full mt-1 shrink-0"></span>
+                            Check VPS resource saturation if high error rates persist.
+                          </li>
+                          <li className="flex gap-3 text-xs leading-relaxed text-slate-300">
+                            <span className="w-1.5 h-1.5 bg-rose-500 rounded-full mt-1 shrink-0"></span>
+                            Validate SSL/TLS certificates for targets showing "Handshake Failure".
+                          </li>
+                        </ul>
                       </div>
-                    ) : (
-                      <AnimatePresence mode="popLayout">
-                        {incidents.map((inc) => (
-                          <motion.div
-                            key={inc.id}
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            className={`glass-panel p-6 rounded-2xl border-l-4 transition-all ${
-                              inc.status === 'RESOLVED' ? 'opacity-60 grayscale-[0.5] border-l-emerald-500' :
-                              inc.severity === 'CRITICAL' ? 'border-l-rose-600 shadow-[0_0_20px_rgba(225,29,72,0.1)]' :
-                              inc.severity === 'HIGH' ? 'border-l-rose-500' :
-                              'border-l-indigo-500'
-                            }`}
-                          >
-                            <div className="flex justify-between items-start mb-4">
-                               <div>
+                      <button
+                        onClick={() => {
+                          const topIncident = incidents.find(i => i.status === 'OPEN' && i.severity === 'CRITICAL') || incidents.find(i => i.status === 'OPEN');
+                          if (topIncident) {
+                            setSelectedIncident(topIncident);
+                          } else {
+                            alert('No open incidents to analyze.');
+                          }
+                        }}
+                        className="w-full py-4 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-black text-xs uppercase tracking-widest rounded-2xl border border-rose-500/30 transition-all flex items-center justify-center gap-3 group"
+                      >
+                        <Activity size={16} className="group-hover:animate-pulse" /> Run AI Diagnostic
+                      </button>
+                    </div>
+                  </div>
+                </section>
+              )}
+
+              {/* 6. INCIDENT MANAGEMENT SECTION */}
+              {activeTab === 'incidents' && (
+                <section>
+                  <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-2xl font-bold flex items-center gap-3 text-indigo-100 uppercase tracking-tight">
+                      <AlertIcon className="text-indigo-500" /> Incident Command Center
+                    </h2>                 <div className="flex gap-4">
+                      <div className="text-[10px] text-slate-500 font-mono flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-rose-500"></span> {filteredIncidents.filter(i => i.status === 'OPEN').length} OPEN
+                      </div>
+                      <div className="text-[10px] text-slate-500 font-mono flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-amber-500"></span> {filteredIncidents.filter(i => i.status === 'INVESTIGATING').length} INVESTIGATING
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+                    <div className="lg:col-span-3 space-y-6">
+                      {filteredIncidents.length === 0 ? (
+                        <div className="glass-panel p-20 text-center opacity-50 flex flex-col items-center">
+                          <CheckCircle size={48} className="text-emerald-500 mb-4" />
+                          <p className="text-xl font-bold uppercase tracking-widest">No Active Incidents</p>
+                        </div>
+                      ) : (
+                        <AnimatePresence mode="popLayout">
+                          {filteredIncidents.map((inc) => (
+                            <motion.div
+                              key={inc.id}
+                              initial={{ opacity: 0, x: -20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              className={`glass-panel p-6 rounded-2xl border-l-4 transition-all ${inc.status === 'RESOLVED' ? 'opacity-60 grayscale-[0.5] border-l-emerald-500' :
+                                  inc.severity === 'CRITICAL' ? 'border-l-rose-600 shadow-[0_0_20px_rgba(225,29,72,0.1)]' :
+                                    inc.severity === 'HIGH' ? 'border-l-rose-500' :
+                                      'border-l-indigo-500'
+                                }`}
+                            >
+                              <div className="flex justify-between items-start mb-4">
+                                <div>
                                   <div className="flex items-center gap-3 mb-1">
-                                     <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${
-                                       inc.severity === 'CRITICAL' ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' :
-                                       inc.severity === 'HIGH' ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' :
-                                       'bg-indigo-500/20 text-indigo-400 border-indigo-500/30'
-                                     }`}>{inc.severity}</span>
-                                     <span className="text-xs font-mono text-slate-500">{new Date(inc.timestamp).toLocaleString()}</span>
+                                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${inc.severity === 'CRITICAL' ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' :
+                                        inc.severity === 'HIGH' ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' :
+                                          'bg-indigo-500/20 text-indigo-400 border-indigo-500/30'
+                                      }`}>{inc.severity}</span>
+                                    <span className="text-xs font-mono text-slate-500">{new Date(inc.timestamp).toLocaleString()}</span>
                                   </div>
                                   <h3 className="text-lg font-bold text-white">{inc.alert_name}</h3>
                                   <p className="text-xs text-indigo-400 font-bold uppercase tracking-widest mt-1">{inc.service}</p>
-                               </div>
-                               <div className="text-right">
+                                </div>
+                                <div className="text-right">
                                   <div className="text-[9px] text-slate-500 uppercase font-black mb-1">AI Confidence</div>
                                   <div className="flex items-center gap-2">
-                                     <div className="w-20 h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                                        <div className="h-full bg-emerald-500" style={{ width: `${inc.confidence}%` }}></div>
-                                     </div>
-                                     <span className="text-xs font-bold text-emerald-400">{inc.confidence}%</span>
+                                    <div className="w-20 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                      <div className="h-full bg-emerald-500" style={{ width: `${inc.confidence}%` }}></div>
+                                    </div>
+                                    <span className="text-xs font-bold text-emerald-400">{inc.confidence}%</span>
                                   </div>
-                               </div>
-                            </div>
+                                </div>
+                              </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                               <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800/50">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 relative">
+                                {(!inc.root_cause || inc.root_cause === 'Gemini API Error' || inc.status === 'OPEN') && (
+                                  <div className="md:col-span-2 bg-slate-950/90 border border-indigo-500/30 rounded-xl p-4 font-mono text-[10px] overflow-hidden relative group">
+                                    <div className="flex items-center gap-2 mb-3 border-b border-indigo-500/20 pb-2">
+                                      <div className="flex gap-1">
+                                        <div className="w-2 h-2 rounded-full bg-rose-500/50"></div>
+                                        <div className="w-2 h-2 rounded-full bg-amber-500/50"></div>
+                                        <div className="w-2 h-2 rounded-full bg-emerald-500/50"></div>
+                                      </div>
+                                      <span className="text-indigo-400 font-bold uppercase tracking-widest">Nexus AI Agent Output</span>
+                                      <div className="ml-auto flex items-center gap-2">
+                                        <span className="w-2 h-2 bg-indigo-500 rounded-full animate-ping"></span>
+                                        <span className="text-indigo-500">LIVE_ANALYSIS</span>
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="space-y-1.5 min-h-[80px]">
+                                      <motion.div initial={{opacity:0}} animate={{opacity:1}} transition={{delay:0.5}} className="flex gap-2">
+                                         <span className="text-slate-600">[00:01]</span>
+                                         <span className="text-emerald-500">INIT</span>
+                                         <span className="text-slate-400">Heuristics engine engaged for {inc.alert_name}...</span>
+                                      </motion.div>
+                                      <motion.div initial={{opacity:0}} animate={{opacity:1}} transition={{delay:1.5}} className="flex gap-2">
+                                         <span className="text-slate-600">[00:03]</span>
+                                         <span className="text-indigo-400">SCAN</span>
+                                         <span className="text-slate-400">Analyzing metrics baseline for {inc.service}...</span>
+                                      </motion.div>
+                                      <motion.div initial={{opacity:0}} animate={{opacity:1}} transition={{delay:2.5}} className="flex gap-2 underline decoration-indigo-500/30">
+                                         <span className="text-slate-600">[00:06]</span>
+                                         <span className="text-amber-500">MATCH</span>
+                                         <span className="text-slate-200">Signature found: {inc.alert_name} (Confidence: {inc.confidence}%)</span>
+                                      </motion.div>
+                                      <motion.div initial={{opacity:0}} animate={{opacity:1}} transition={{delay:3.5}} className="flex gap-2">
+                                         <span className="text-slate-600">[00:08]</span>
+                                         <span className="text-emerald-500">DONE</span>
+                                         <span className="text-slate-400">Root cause identified. Formulating remediation...</span>
+                                      </motion.div>
+                                    </div>
+
+                                    {/* Overlay that vanishes after "Thinking" */}
+                                    <motion.div 
+                                      initial={{ opacity: 1 }} 
+                                      animate={{ opacity: 0 }} 
+                                      transition={{ delay: 5.5, duration: 0.5 }}
+                                      className="absolute inset-x-0 bottom-0 top-[35px] bg-slate-950/40 backdrop-blur-[1px] pointer-events-none"
+                                    />
+                                  </div>
+                                )}
+
+                                <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800/50">
                                   <div className="text-[10px] text-slate-500 uppercase font-bold mb-2">Root Cause Analysis</div>
                                   <p className="text-sm text-slate-300 leading-relaxed italic">"{inc.root_cause}"</p>
-                               </div>
-                               <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800/50">
+                                </div>
+                                <div className="bg-slate-900/60 p-4 rounded-xl border border-slate-800/50">
                                   <div className="text-[10px] text-slate-500 uppercase font-bold mb-2">Remediation Steps</div>
                                   <p className="text-sm text-emerald-400/90 leading-relaxed">{inc.suggested_fix}</p>
-                               </div>
-                            </div>
+                                </div>
+                              </div>
 
-                            <div className="flex justify-between items-center pt-4 border-t border-slate-800/50">
-                               <div className="flex gap-3">
-                                  <button 
+                              <div className="flex justify-between items-center pt-4 border-t border-slate-800/50">
+                                <div className="flex gap-3">
+                                  <button
                                     onClick={() => setSelectedIncident(inc)}
                                     className="px-4 py-2.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 font-bold text-[10px] uppercase tracking-widest border border-indigo-500/30 rounded-xl transition-all"
                                   >
-                                     Investigate Timeline
+                                    Investigate Timeline
                                   </button>
-                                  <button 
+                                  <button
                                     onClick={() => handleStatusUpdate(inc.id, 'RESOLVED')}
                                     className="px-4 py-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 font-bold text-[10px] uppercase tracking-widest border border-emerald-500/30 rounded-xl transition-all"
                                   >
-                                     Resolve
+                                    Resolve
                                   </button>
-                               </div>
-                               <div className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-tighter ${
-                                 inc.status === 'RESOLVED' ? 'bg-emerald-500/10 text-emerald-500' :
-                                 inc.status === 'INVESTIGATING' ? 'bg-amber-500/10 text-amber-500' :
-                                 'bg-rose-500/10 text-rose-500 animate-pulse'
-                               }`}>
-                                 Status: {inc.status}
-                               </div>
-                            </div>
-                          </motion.div>
-                        ))}
-                      </AnimatePresence>
-                    )}
-                 </div>
-                 
-                 <div className="space-y-6">
-                    <div className="glass-panel p-6 rounded-2xl border border-indigo-500/20 shadow-[0_0_15px_rgba(99,102,241,0.05)]">
-                       <h3 className="text-sm font-bold text-indigo-300 mb-6 flex items-center gap-2">
+                                </div>
+                                <div className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-tighter ${inc.status === 'RESOLVED' ? 'bg-emerald-500/10 text-emerald-500' :
+                                    inc.status === 'INVESTIGATING' ? 'bg-amber-500/10 text-amber-500' :
+                                      'bg-rose-500/10 text-rose-500 animate-pulse'
+                                  }`}>
+                                  Status: {inc.status}
+                                </div>
+                              </div>
+                            </motion.div>
+                          ))}
+                        </AnimatePresence>
+                      )}
+                    </div>
+
+                    <div className="space-y-6">
+                      <div className="glass-panel p-6 rounded-2xl border border-indigo-500/20 shadow-[0_0_15px_rgba(99,102,241,0.05)]">
+                        <h3 className="text-sm font-bold text-indigo-300 mb-6 flex items-center gap-2">
                           <Activity size={16} /> Incident KPIs
-                       </h3>
-                       <div className="space-y-6">
+                        </h3>
+                        <div className="space-y-6">
                           <div>
-                             <div className="flex justify-between text-[10px] font-bold text-slate-500 uppercase mb-2">
-                                <span>Mean Time to Resolve</span>
-                                <span className="text-white">{analytics.mttr}m</span>
-                             </div>
-                             <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                                <div className="h-full bg-indigo-500" style={{ width: `${Math.min(100, Number(analytics.mttr) * 5)}%` }}></div>
-                             </div>
+                            <div className="flex justify-between text-[10px] font-bold text-slate-500 uppercase mb-2">
+                              <span>Mean Time to Resolve</span>
+                              <span className="text-white">{analytics.mttr}m</span>
+                            </div>
+                            <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                              <div className="h-full bg-indigo-500" style={{ width: `${Math.min(100, Number(analytics.mttr) * 5)}%` }}></div>
+                            </div>
                           </div>
                           <div>
-                             <div className="flex justify-between text-[10px] font-bold text-slate-500 uppercase mb-2">
-                                <span>AI Accuracy (Confidence)</span>
-                                <span className="text-white">{incidents.length > 0 ? (incidents.reduce((acc: any, i: any) => acc + i.confidence, 0) / incidents.length).toFixed(1) : 0}%</span>
-                             </div>
-                             <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                                <div className="h-full bg-emerald-500" style={{ width: `${incidents.length > 0 ? (incidents.reduce((acc: any, i: any) => acc + i.confidence, 0) / incidents.length) : 0}%` }}></div>
-                             </div>
+                            <div className="flex justify-between text-[10px] font-bold text-slate-500 uppercase mb-2">
+                              <span>AI Accuracy (Confidence)</span>
+                              <span className="text-white">{incidents.length > 0 ? (incidents.reduce((acc: any, i: any) => acc + i.confidence, 0) / incidents.length).toFixed(1) : 0}%</span>
+                            </div>
+                            <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                              <div className="h-full bg-emerald-500" style={{ width: `${incidents.length > 0 ? (incidents.reduce((acc: any, i: any) => acc + i.confidence, 0) / incidents.length) : 0}%` }}></div>
+                            </div>
                           </div>
                           <div className="pt-4 grid grid-cols-2 gap-3">
-                             <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800/50 text-center">
-                                <div className="text-xl font-black text-rose-500">{incidents.filter(i => i.status === 'OPEN').length}</div>
-                                <div className="text-[8px] text-slate-500 uppercase font-black tracking-tighter">Current Backlog</div>
-                             </div>
-                             <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800/50 text-center">
-                                <div className="text-xl font-black text-emerald-500">{incidents.filter(i => i.status === 'RESOLVED').length}</div>
-                                <div className="text-[8px] text-slate-500 uppercase font-black tracking-tighter">Resolved (24h)</div>
-                             </div>
+                            <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800/50 text-center">
+                              <div className="text-xl font-black text-rose-500">{incidents.filter(i => i.status === 'OPEN').length}</div>
+                              <div className="text-[8px] text-slate-500 uppercase font-black tracking-tighter">Current Backlog</div>
+                            </div>
+                            <div className="p-3 bg-slate-900/60 rounded-xl border border-slate-800/50 text-center">
+                              <div className="text-xl font-black text-emerald-500">{incidents.filter(i => i.status === 'RESOLVED').length}</div>
+                              <div className="text-[8px] text-slate-500 uppercase font-black tracking-tighter">Resolved (24h)</div>
+                            </div>
                           </div>
-                       </div>
-                    </div>
-                    
-                    <button className="w-full py-4 bg-indigo-500 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-lg shadow-indigo-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all">
-                       Export SLA Report (PDF)
-                    </button>
-                    
-                    <div className="bg-slate-900/40 p-4 rounded-xl border border-slate-800 text-[10px] text-slate-500 leading-relaxed font-mono">
-                       <div className="text-indigo-400 font-bold mb-1">PLATFORM INSIGHT</div>
-                       AI suggests that the last 3 critical incidents were related to VPS-NYC-02 resource exhaustion.
-                    </div>
-                 </div>
-              </div>
-            </section>
-            )}
-         </motion.div>
-      </AnimatePresence>
+                        </div>
+                      </div>
 
-      {/* Shared Modals & Widgets */}
-      <AnimatePresence>
-        {selectedSite && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-10">
-            <motion.div 
-               initial={{ opacity: 0 }}
-               animate={{ opacity: 1 }}
-               exit={{ opacity: 0 }}
-               onClick={() => setSelectedSite(null)}
-               className="absolute inset-0 bg-slate-950/80 backdrop-blur-md"
-            ></motion.div>
-            
-            <motion.div
-              layoutId={`logs-${selectedSite.target}`}
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-5xl bg-[#0b0f19] border border-slate-700/50 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]"
-            >
-              {/* Modal Header */}
-              <div className="px-6 py-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-400">
-                    <Maximize2 size={18} />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-bold text-white leading-none mb-1">Live Terminal: {selectedSite.target.replace(/https?:\/\//, '')}</h2>
-                    <p className="text-[10px] text-slate-500 font-mono uppercase tracking-widest">{selectedSite.vps} Infrastructure</p>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => setSelectedSite(null)}
-                  className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 transition-colors"
-                >
-                  <X size={20} />
-                </button>
-              </div>
+                      <button
+                        onClick={() => {
+                          if (incidents.length === 0) return alert('No incidents to export');
+                          const header = 'ID,Alert Name,Severity,Status,Timestamp,Root Cause,Suggested Fix\n';
+                          const csv = incidents.map(i => `${i.id},"${i.alert_name}",${i.severity},${i.status},${new Date(i.timestamp).toISOString()},"${i.root_cause || ''}","${i.suggested_fix || ''}"`).join('\n');
+                          const blob = new Blob([header + csv], { type: 'text/csv' });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = url;
+                          a.download = `nexus_sla_report_${new Date().toISOString().slice(0, 10)}.csv`;
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                        }}
+                        className="w-full py-4 bg-indigo-500 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-lg shadow-indigo-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                      >
+                        Export SLA Report (CSV)
+                      </button>
 
-              {/* Log Viewer Container */}
-              <div className="flex-1 overflow-hidden p-6 bg-[#060910]">
-                <LiveLogsViewer 
-                  target={selectedSite.target}
-                  siteName={selectedSite.target.replace(/https?:\/\//, '')}
-                  className="h-full border-0 !bg-transparent"
-                />
-              </div>
-              
-              {/* Bottom Instructions */}
-              <div className="px-6 py-3 bg-slate-950/50 border-t border-slate-800 flex justify-between items-center">
-                 <div className="flex items-center gap-2 text-[10px] text-slate-500 font-mono">
-                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
-                    READ-TIME LOG STREAM ACTIVE
-                 </div>
-                 <div className="text-[10px] text-slate-400 flex gap-4">
-                    <span>Press ESC to exit</span>
-                    <span>Scroll to browse history</span>
-                 </div>
-              </div>
+                      <div className="bg-slate-900/40 p-4 rounded-xl border border-slate-800 text-[10px] text-slate-500 leading-relaxed font-mono">
+                        <div className="text-indigo-400 font-bold mb-1">PLATFORM INSIGHT</div>
+                        AI suggests that the last 3 critical incidents were related to VPS-NYC-02 resource exhaustion.
+                      </div>
+                    </div>
+                  </div>
+                </section>
+              )}
             </motion.div>
-          </div>
-        )}
+          </AnimatePresence>
 
-        {selectedIncident && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-10">
-            <motion.div 
-               initial={{ opacity: 0 }}
-               animate={{ opacity: 1 }}
-               exit={{ opacity: 0 }}
-               onClick={() => setSelectedIncident(null)}
-               className="absolute inset-0 bg-slate-950/90 backdrop-blur-xl"
-            ></motion.div>
-            
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-4xl bg-[#0b0f19] border border-slate-700/50 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
-            >
-              {/* Modal Header */}
-              <div className="px-8 py-5 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className={`p-2.5 rounded-xl ${selectedIncident.severity === 'CRITICAL' ? 'bg-rose-500/10 text-rose-500' : 'bg-amber-500/10 text-amber-500'}`}>
-                    <ShieldAlert size={22} />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-black text-white leading-none mb-1">{selectedIncident.alert_name}</h2>
-                    <p className="text-[10px] text-slate-500 font-mono uppercase tracking-[0.2em]">Incident ID: {selectedIncident.id} • {selectedIncident.service}</p>
-                  </div>
-                </div>
-                <button 
-                  onClick={() => setSelectedIncident(null)}
-                  className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 transition-colors"
+          {/* Shared Modals & Widgets */}
+          <AnimatePresence>
+            {selectedSite && (
+              <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-10">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setSelectedSite(null)}
+                  className="absolute inset-0 bg-slate-950/80 backdrop-blur-md"
+                ></motion.div>
+
+                <motion.div
+                  layoutId={`logs-${selectedSite.target}`}
+                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                  className="relative w-full max-w-5xl bg-[#0b0f19] border border-slate-700/50 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh]"
                 >
-                  <X size={24} />
-                </button>
-              </div>
-
-              {/* Modal Content */}
-              <div className="flex-1 overflow-y-auto px-8 py-8 grid grid-cols-1 lg:grid-cols-3 gap-10">
-                 {/* Timeline Section */}
-                 <div className="lg:col-span-2 space-y-8">
-                    <div>
-                       <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-6 flex items-center gap-2">
-                          <Terminal size={14} className="text-indigo-500" /> Root Cause Storyboard
-                       </h3>
-                       <RootCauseTimeline events={timelineEvents} isLoading={isTimelineLoading} />
+                  {/* Modal Header */}
+                  <div className="px-6 py-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-400">
+                        <Maximize2 size={18} />
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-bold text-white leading-none mb-1">Live Terminal: {selectedSite.target.replace(/https?:\/\//, '')}</h2>
+                        <p className="text-[10px] text-slate-500 font-mono uppercase tracking-widest">{selectedSite.vps} Infrastructure</p>
+                      </div>
                     </div>
-                 </div>
+                    <button
+                      onClick={() => setSelectedSite(null)}
+                      className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 transition-colors"
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
 
-                 {/* Actions & AI Section */}
-                 <div className="space-y-6">
-                    <div className="glass-panel p-6 rounded-2xl border border-indigo-500/20 bg-indigo-500/5">
-                       <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                  {/* Log Viewer Container */}
+                  <div className="flex-1 overflow-hidden p-6 bg-[#060910]">
+                    <LiveLogsViewer
+                      target={selectedSite.target}
+                      siteName={selectedSite.target.replace(/https?:\/\//, '')}
+                      className="h-full border-0 !bg-transparent"
+                    />
+                  </div>
+
+                  {/* Bottom Instructions */}
+                  <div className="px-6 py-3 bg-slate-950/50 border-t border-slate-800 flex justify-between items-center">
+                    <div className="flex items-center gap-2 text-[10px] text-slate-500 font-mono">
+                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
+                      READ-TIME LOG STREAM ACTIVE
+                    </div>
+                    <div className="text-[10px] text-slate-400 flex gap-4">
+                      <span>Press ESC to exit</span>
+                      <span>Scroll to browse history</span>
+                    </div>
+                  </div>
+                </motion.div>
+              </div>
+            )}
+
+            {selectedIncident && (
+              <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-10">
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setSelectedIncident(null)}
+                  className="absolute inset-0 bg-slate-950/90 backdrop-blur-xl"
+                ></motion.div>
+
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                  className="relative w-full max-w-4xl bg-[#0b0f19] border border-slate-700/50 rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
+                >
+                  {/* Modal Header */}
+                  <div className="px-8 py-5 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className={`p-2.5 rounded-xl ${selectedIncident.severity === 'CRITICAL' ? 'bg-rose-500/10 text-rose-500' : 'bg-amber-500/10 text-amber-500'}`}>
+                        <ShieldAlert size={22} />
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-black text-white leading-none mb-1">{selectedIncident.alert_name}</h2>
+                        <p className="text-[10px] text-slate-500 font-mono uppercase tracking-[0.2em]">Incident ID: {selectedIncident.id} • {selectedIncident.service}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setSelectedIncident(null)}
+                      className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 transition-colors"
+                    >
+                      <X size={24} />
+                    </button>
+                  </div>
+
+                  {/* Modal Content */}
+                  <div className="flex-1 overflow-y-auto px-8 py-8 grid grid-cols-1 lg:grid-cols-3 gap-10">
+                    {/* Timeline Section */}
+                    <div className="lg:col-span-2 space-y-8">
+                      <div>
+                        <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-6 flex items-center gap-2">
+                          <Terminal size={14} className="text-indigo-500" /> Root Cause Storyboard
+                        </h3>
+                        <RootCauseTimeline events={timelineEvents} isLoading={isTimelineLoading} />
+                      </div>
+                    </div>
+
+                    {/* Actions & AI Section */}
+                    <div className="space-y-6">
+                      <div className="glass-panel p-6 rounded-2xl border border-indigo-500/20 bg-indigo-500/5 relative overflow-hidden">
+                        <div className="absolute top-0 right-0 p-2 opacity-10">
+                          <Activity size={40} className="text-indigo-400" />
+                        </div>
+                        <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                           <Shield size={12} /> AI Incident Analyst
-                       </h4>
-                       
-                       {aiAnalysis ? (
-                         <motion.div 
-                           initial={{ opacity: 0, y: 5 }} 
-                           animate={{ opacity: 1, y: 0 }}
-                           className="space-y-4"
-                         >
+                        </h4>
+
+                        <div className="bg-slate-950/80 rounded-xl p-3 font-mono text-[9px] text-slate-400 mb-6 border border-slate-800">
+                          <div className="flex items-center gap-2 mb-2 text-indigo-500/70 border-b border-slate-800 pb-1">
+                             <Terminal size={10} /> Agent-Logs: v3.1.2-nexus
+                          </div>
+                          <div className="space-y-1">
+                            <div className="flex gap-2 animate-pulse"><span className="text-slate-600">&gt;</span> SCANNING_VPC_TRAFFIC</div>
+                            <div className="flex gap-2"><span className="text-slate-600">&gt;</span> CORRELATING_HOST_LOGS</div>
+                            <div className="flex gap-2"><span className="text-slate-600">&gt;</span> IDENTIFIED_THREAT: {selectedIncident.alert_name}</div>
+                            <div className="flex gap-2 text-emerald-400"><span className="text-slate-600">&gt;</span> READY_FOR_REMEDIATION</div>
+                          </div>
+                        </div>
+
+                        {aiAnalysis ? (
+                          <motion.div
+                            initial={{ opacity: 0, y: 5 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="space-y-4"
+                          >
                             <div className="text-[10px] text-slate-300 leading-relaxed bg-slate-950/50 p-3 rounded-lg border border-slate-800">
-                               <span className="text-indigo-400 font-bold block mb-1">PROBABLE ROOT CAUSE</span>
-                               {aiAnalysis.rootCause}
+                              <span className="text-indigo-400 font-bold block mb-1">PROBABLE ROOT CAUSE</span>
+                              {aiAnalysis.rootCause}
                             </div>
                             <div className="text-[10px] text-slate-300 leading-relaxed bg-emerald-500/5 p-3 rounded-lg border border-emerald-500/20">
-                               <span className="text-emerald-400 font-bold block mb-1">SUGGESTED ACTION</span>
-                               {aiAnalysis.suggestedFix}
+                              <span className="text-emerald-400 font-bold block mb-1">SUGGESTED ACTION</span>
+                              {aiAnalysis.suggestedFix}
                             </div>
-                         </motion.div>
-                       ) : (
-                         <>
-                           <p className="text-xs text-slate-300 leading-relaxed mb-6">
+                          </motion.div>
+                        ) : (
+                          <>
+                            <p className="text-xs text-slate-300 leading-relaxed mb-6">
                               Gemini can correlate metrics, logs, and traces to identify the root cause of this incident.
-                           </p>
-                           <button 
-                             onClick={handleExplainAI}
-                             disabled={isAnalyzing}
-                             className="w-full py-3 bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2"
-                           >
+                            </p>
+                            <button
+                              onClick={handleExplainAI}
+                              disabled={isAnalyzing}
+                              className="w-full py-3 bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2"
+                            >
                               {isAnalyzing ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <Shield size={14} />}
                               {isAnalyzing ? 'Analyzing Failure...' : 'Explain with Gemini AI'}
-                           </button>
-                         </>
-                       )}
-                    </div>
+                            </button>
+                          </>
+                        )}
+                      </div>
 
-                    <div className="space-y-3">
-                       <button className="w-full py-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold text-[10px] uppercase tracking-widest rounded-xl transition-all">
-                          Acknowledge Incident
-                       </button>
-                       <button className="w-full py-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/30 font-bold text-[10px] uppercase tracking-widest rounded-xl transition-all">
+                      <div className="space-y-3">
+                        <button 
+                          onClick={() => setSelectedIncident(null)}
+                          className="w-full py-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold text-[10px] uppercase tracking-widest rounded-xl transition-all"
+                        >
+                          Acknowledge & Investigate
+                        </button>
+                        <button 
+                          onClick={() => {
+                            handleStatusUpdate(selectedIncident.id, 'RESOLVED');
+                            setSelectedIncident(null);
+                          }}
+                          className="w-full py-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-500 border border-emerald-500/30 font-bold text-[10px] uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 group"
+                        >
+                          <ShieldCheck size={14} className="group-hover:scale-110 transition-transform" />
                           Resolve Incident
-                       </button>
+                        </button>
+                      </div>
                     </div>
-                 </div>
+                  </div>
+                </motion.div>
               </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+            )}
+          </AnimatePresence>
 
-      <motion.div 
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.8 }}
-        className="mt-20 pt-8 border-t border-slate-800/50 flex flex-col md:flex-row justify-between items-center gap-6"
-      >
-         <div className="text-slate-500 text-xs font-medium">© 2026 Nexus Monitoring Systems • Autonomous SOC Module</div>
-         <div className="flex gap-4">
-            <button className="text-[10px] font-bold text-slate-400 hover:text-indigo-400 uppercase tracking-[0.2em] transition-colors">Documentation</button>
-            <button className="text-[10px] font-bold text-slate-400 hover:text-indigo-400 uppercase tracking-[0.2em] transition-colors">API Access</button>
-            <button className="text-[10px] font-bold text-slate-400 hover:text-indigo-400 uppercase tracking-[0.2em] transition-colors">System Logs</button>
-         </div>
-      </motion.div>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.8 }}
+            className="mt-20 pt-8 border-t border-slate-800/50 flex flex-col md:flex-row justify-between items-center gap-6"
+          >
+            <div className="text-slate-500 text-xs font-medium">© 2026 Nexus Monitoring Systems • Autonomous SOC Module</div>
+            <div className="flex gap-4">
+              <button className="text-[10px] font-bold text-slate-400 hover:text-indigo-400 uppercase tracking-[0.2em] transition-colors">Documentation</button>
+              <button className="text-[10px] font-bold text-slate-400 hover:text-indigo-400 uppercase tracking-[0.2em] transition-colors">API Access</button>
+              <button className="text-[10px] font-bold text-slate-400 hover:text-indigo-400 uppercase tracking-[0.2em] transition-colors">System Logs</button>
+            </div>
+          </motion.div>
 
-      <ChatWidget activeIncident={incidents.length > 0 ? incidents[0] : undefined} />
+          <ChatWidget activeIncident={incidents.length > 0 ? incidents[0] : undefined} />
+
+          <CommandPalette
+            isOpen={isCommandPaletteOpen}
+            onClose={() => setIsCommandPaletteOpen(false)}
+            onAction={async (action, target) => {
+              if (action.startsWith('go-')) {
+                setActiveTab(action.split('-')[1] as any);
+              } else {
+                try {
+                  const res = await fetch('http://localhost:3001/v1/control/execute', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action, target })
+                  });
+                  const data = await res.json();
+                  if (res.ok) {
+                    alert(`Command Success: ${data.message || 'Action executed successfully.'}`);
+                  } else {
+                    alert(`Command Failed: ${data.error || 'Unknown error'}`);
+                  }
+                } catch (err) {
+                  alert(`Command Failed: Network error or server offline.`);
+                }
+              }
+            }}
+          />
+        </div>
+      </main>
       
-      <CommandPalette 
-        isOpen={isCommandPaletteOpen} 
-        onClose={() => setIsCommandPaletteOpen(false)}
-        onAction={(action, target) => {
-          if (action.startsWith('go-')) {
-            setActiveTab(action.split('-')[1] as any);
-          } else {
-            console.log(`Executing palette command: ${action} on ${target}`);
-          }
-        }}
-      />
-      </div>
-    </main>
+      <SandboxSimulator isOpen={isSandboxOpen} onClose={() => setIsSandboxOpen(false)} />
     </>
   );
 }

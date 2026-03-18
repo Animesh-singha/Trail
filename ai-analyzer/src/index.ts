@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { webhookRoutes } from './routes/webhook.route';
 import { incidentRoutes } from './routes/incident.route';
 import { controlRoutes } from './routes/control.route';
+import { sandboxRoutes } from './routes/sandbox.route';
 import { eventRoutes } from './routes/event.route';
 import { authRoutes } from './routes/auth.route';
 
@@ -21,6 +22,7 @@ server.register(incidentRoutes, { prefix: '/v1' });
 server.register(controlRoutes, { prefix: '/v1' });
 server.register(eventRoutes, { prefix: '/v1' });
 server.register(authRoutes, { prefix: '/v1' });
+server.register(sandboxRoutes, { prefix: '/v1/sandbox' });
 
 server.get('/health', async (request, reply) => {
   return { status: 'ok', timestamp: new Date().toISOString() };
