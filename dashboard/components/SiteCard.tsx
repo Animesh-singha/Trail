@@ -15,6 +15,7 @@ export default function SiteCard({ target, vps, onClick }: SiteCardProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [actionPending, setActionPending] = useState<string | null>(null);
   const [backupStatus, setBackupStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
   const siteName = target.replace(/https?:\/\//, '');
   // Derive a likely db_name from the site URL (e.g., yoforex.com -> yoforex_db)
   const dbName = siteName.split('.')[0].replace(/-/g, '_') + '_db';
@@ -39,9 +40,12 @@ export default function SiteCard({ target, vps, onClick }: SiteCardProps) {
     setActionPending(action);
     setIsMenuOpen(false);
     try {
-      const res = await fetch('http://localhost:3001/v1/control/execute', {
+      const res = await fetch(`${API_BASE}/v1/control/execute`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('nexus_token')}`
+        },
         body: JSON.stringify({ target, action })
       });
       const result = await res.json();
@@ -58,9 +62,12 @@ export default function SiteCard({ target, vps, onClick }: SiteCardProps) {
     setIsMenuOpen(false);
     setBackupStatus('loading');
     try {
-      const res = await fetch('http://localhost:3001/v1/control/backup', {
+      const res = await fetch(`${API_BASE}/v1/control/backup`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('nexus_token')}`
+        },
         body: JSON.stringify({ target: dbName })
       });
       const data = await res.json();

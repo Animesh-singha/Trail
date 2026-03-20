@@ -46,7 +46,7 @@ export default function AlertTimeline({ incidents }: AlertTimelineProps) {
 
             <div className="flex justify-between items-start mb-1">
               <span className="text-[10px] font-bold text-white leading-tight uppercase tracking-tight">{event.alert_name}</span>
-              <span className="text-[8px] text-slate-600 font-mono">{new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+              <span className="text-[8px] text-slate-600 font-mono" suppressHydrationWarning>{new Date(event.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
             </div>
             
             <div className="flex items-center gap-2">

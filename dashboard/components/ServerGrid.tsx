@@ -35,12 +35,16 @@ export default function ServerGrid() {
   }, []);
 
   const handleAction = async (hostname: string, action: string) => {
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
     setActionPending(`${hostname}-${action}`);
     setActiveMenu(null);
     try {
-      const res = await fetch('http://localhost:3001/v1/control/execute', {
+      const res = await fetch(`${API_BASE}/v1/control/execute`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('nexus_token')}`
+        },
         body: JSON.stringify({ target: hostname, action })
       });
       const result = await res.json();

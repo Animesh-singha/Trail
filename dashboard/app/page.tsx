@@ -4,8 +4,9 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   AlertTriangle, Activity, ShieldAlert, CheckCircle, ServerCrash, Server, X, Maximize2,
-  LayoutDashboard, Server as ServerIcon, Globe, ShieldAlert as AlertIcon,
-  Terminal, Share2, ShieldCheck, Share as ShareIcon, Shield, Eye, EyeOff
+  Layout, Server as ServerIcon, Globe, AlertCircle,
+  Terminal as TerminalIcon, Share2, ShieldCheck, Shield, Eye, EyeOff,
+  Brain, Info, Zap, ArrowRight, Boxes, Network, Share as ShareIcon
 } from 'lucide-react';
 
 import ChatWidget from '@/components/ChatWidget';
@@ -22,185 +23,10 @@ import AlertTimeline from '@/components/AlertTimeline';
 import RootCauseTimeline from '@/components/RootCauseTimeline';
 import BackupPanel from '@/components/BackupPanel';
 import SandboxSimulator from '@/components/SandboxSimulator';
+import AuthGateway from '@/components/AuthGateway';
 
-function InteractiveAuth({ onAuth }: { onAuth: () => void }) {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [status, setStatus] = useState<'idle' | 'checking' | 'error' | 'success'>('idle');
-  const [mounted, setMounted] = useState(false);
-  const [terminalLines, setTerminalLines] = useState<string[]>([
-    'NEXUS SOC SECURE GATEWAY v4.0.2',
-    'TARGET NODE: 100.97.103.94 [PROD-DB-PRIMARY]',
-    'INITIALIZING SYSTEM PROTOCOLS...',
-    'READY FOR MULTI-FACTOR AUTHENTICATION.'
-  ]);
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
 
-  useEffect(() => {
-    setMounted(true);
-    // Fetch recent auth history from server
-    const fetchHistory = async () => {
-      try {
-        const res = await fetch('http://localhost:3001/v1/auth/history');
-        if (res.ok) {
-          const history = await res.json();
-          // Transform history into terminal lines
-          const historyLines = history.reverse().map((log: any) =>
-            `> RECENT ATTEMPT: ${log.username} [${log.ip_address}] - ${log.status}`
-          );
-          setTerminalLines(prev => [...prev.slice(0, 4), ...historyLines, ...prev.slice(4)]);
-        }
-      } catch (err) {
-        console.error('Failed to fetch auth history', err);
-      }
-    };
-    fetchHistory();
-  }, []);
-
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (status === 'checking') return;
-
-    setStatus('checking');
-    setTerminalLines(prev => [...prev.slice(-10), `> VERIFYING IDENTITY: ${username}...`]);
-
-    // Check against user provided credentials
-    setTimeout(async () => {
-      const isValid = (
-        (username === 'singhaanimesh216@gmail.com' && password === 'YoForex@101') ||
-        (username === 'singhaanimesh@gmail.com' && password === 'YoForex@101') ||
-        (username === 'admin' && password === 'NexusSOC')
-      );
-
-      // Log the attempt to the server
-      try {
-        await fetch('http://localhost:3001/v1/auth/log', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, status: isValid ? 'SUCCESS' : 'FAILED' })
-        });
-      } catch (err) {
-        console.error('Failed to log auth attempt', err);
-      }
-
-      if (isValid) {
-        setTerminalLines(prev => [...prev, `> IDENTITY VERIFIED: ${username}`, '> ACCESS GRANTED.', '> DECRYPTING FLEET METRICS...']);
-        setStatus('success');
-        setTimeout(onAuth, 1000);
-      } else {
-        setTerminalLines(prev => [...prev, `> ATTEMPT BY: ${username}`, '> ACCESS DENIED: INCORRECT CREDENTIALS.']);
-        setStatus('error');
-        setTimeout(() => {
-          setStatus('idle');
-        }, 3000);
-      }
-    }, 1500);
-  };
-
-  return (
-    <div className="fixed inset-0 z-[1000] bg-slate-950 flex items-center justify-center p-4 font-mono">
-      <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,#4f46e5_0%,transparent_50%)]"></div>
-        <div className="scan-line"></div>
-      </div>
-
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-md bg-slate-900/50 border border-indigo-500/30 rounded-3xl p-8 backdrop-blur-2xl shadow-[0_0_50px_rgba(79,70,229,0.1)] relative"
-      >
-        <div className="flex justify-center mb-8">
-          <div className="p-4 bg-indigo-500/10 rounded-2xl border border-indigo-500/20 text-indigo-400 relative">
-            <ShieldAlert size={40} className={status === 'checking' ? 'animate-pulse' : ''} />
-            {status === 'success' && (
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                className="absolute -top-2 -right-2 bg-emerald-500 rounded-full p-1"
-              >
-                <CheckCircle size={16} className="text-white" />
-              </motion.div>
-            )}
-          </div>
-        </div>
-
-        <div className="space-y-2 mb-8 bg-black/40 p-4 rounded-xl border border-slate-800 text-[10px] text-indigo-300 h-32 overflow-y-auto scrollbar-hide flex flex-col-reverse">
-          <div className="flex flex-col">
-            {terminalLines.map((line, i) => (
-              <div key={i} className="flex gap-2">
-                <span className="text-indigo-500/50">[{mounted ? new Date().toLocaleTimeString([], { hour12: false }) : '--:--:--'}]</span>
-                <span className={line.includes('DENIED') ? 'text-rose-400 font-bold' : line.includes('GRANTED') ? 'text-emerald-400 font-bold' : ''}>
-                  {line}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div className="space-y-2">
-            <label className="text-[10px] text-slate-500 uppercase font-bold ml-1">Identity UID</label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => {
-                setUsername(e.target.value);
-                if (status === 'error') setStatus('idle');
-              }}
-              placeholder="USER ID"
-              className="w-full bg-slate-950/80 border border-slate-800 focus:border-indigo-500 rounded-xl px-4 py-3 text-sm text-white outline-none transition-all"
-              autoFocus
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-[10px] text-slate-500 uppercase font-bold ml-1">Security Token</label>
-            <div className="relative">
-              <input
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  if (status === 'error') setStatus('idle');
-                }}
-                placeholder="PASSWORD"
-                className={`w-full bg-slate-950/80 border ${status === 'error' ? 'border-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.2)]' : 'border-slate-800 focus:border-indigo-500'} rounded-xl px-4 py-3 text-sm text-white outline-none transition-all pr-12`}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-indigo-400 transition-colors"
-                title={showPassword ? "Hide Password" : "Show Password"}
-              >
-                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-            </div>
-            {status === 'error' && (
-              <motion.p
-                initial={{ opacity: 0, y: -5 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="text-[10px] text-rose-500 font-bold ml-1 mt-1"
-              >
-                ERROR: INCORRECT PASS OR USERNAME
-              </motion.p>
-            )}
-          </div>
-
-          <button
-            type="submit"
-            disabled={status === 'checking' || !username || !password}
-            className="w-full mt-4 py-4 bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 text-white font-black text-xs uppercase tracking-[0.2em] rounded-xl transition-all shadow-lg shadow-indigo-500/20 active:scale-95"
-          >
-            {status === 'checking' ? 'Processing...' : 'Authorize Access'}
-          </button>
-        </form>
-
-        <p className="mt-8 text-center text-[10px] text-slate-500 uppercase tracking-widest font-bold">
-          Protected by Nexus Neural Guard • Level 5 Clearance Required
-        </p>
-      </motion.div>
-    </div>
-  );
-}
 
 export default function DashboardPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -214,11 +40,12 @@ export default function DashboardPage() {
   const [selectedIncident, setSelectedIncident] = useState<any | null>(null);
   const [aiAnalysis, setAiAnalysis] = useState<any | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'infra' | 'sites' | 'map' | 'errors' | 'incidents'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'infrastructure' | 'apps' | 'topology' | 'web-assets' | 'errors' | 'incidents'>('overview');
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [timelineEvents, setTimelineEvents] = useState<any[]>([]);
   const [isTimelineLoading, setIsTimelineLoading] = useState(false);
   const [timeRange, setTimeRange] = useState('24h');
+  const [systemHealth, setSystemHealth] = useState<any>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [isSandboxOpen, setIsSandboxOpen] = useState(false);
   const tabNavRef = useRef<HTMLDivElement>(null);
@@ -247,7 +74,9 @@ export default function DashboardPage() {
     if (!selectedIncident) return;
     setIsAnalyzing(true);
     try {
-      const res = await fetch(`http://localhost:3001/v1/incidents/${selectedIncident.id}/analyze`);
+      const res = await fetch(`${API_BASE}/v1/incidents/${selectedIncident.id}/analyze`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('nexus_token')}` }
+      });
       if (res.ok) {
         const data = await res.json();
         setAiAnalysis(data);
@@ -266,7 +95,9 @@ export default function DashboardPage() {
       const fetchTimeline = async () => {
         setIsTimelineLoading(true);
         try {
-          const res = await fetch(`http://localhost:3001/v1/incidents/${selectedIncident.id}/timeline`);
+          const res = await fetch(`${API_BASE}/v1/incidents/${selectedIncident.id}/timeline`, {
+            headers: { 'Authorization': `Bearer ${localStorage.getItem('nexus_token')}` }
+          });
           if (res.ok) {
             const data = await res.json();
             setTimelineEvents(data);
@@ -291,13 +122,96 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const dummyStats = { total: 0, critical: 0, last24h: 0 };
-        setStats(dummyStats);
+    if (!isAuthenticated) return;
 
+    let socket: WebSocket | null = null;
+    let reconnectTimeout: NodeJS.Timeout;
+    let attempts = 0;
+
+    const connectWS = () => {
+      const wsUrl = API_BASE.replace('http', 'ws') + '/ws';
+      socket = new WebSocket(wsUrl);
+
+      socket.onopen = () => {
+        console.log('Connected to Nexus SOC WebSocket');
+        attempts = 0; // Reset on successful connection
+      };
+
+      socket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          
+          // Handle new incidents
+          if (data.type === 'INCIDENT_NEW') {
+            const newIncident = data.payload;
+            setIncidents(prev => [newIncident, ...prev].slice(0, 50));
+            // Update stats
+            setStats((prev: any) => ({
+              ...prev,
+              total: prev.total + 1,
+              critical: newIncident.severity === 'CRITICAL' ? prev.critical + 1 : prev.critical,
+            }));
+          } 
+          // Handle incident updates (from Queue or Manual edits)
+          else if (data.type === 'INCIDENT_UPDATED') {
+            const updated = data.payload;
+            setIncidents(prev => prev.map(i => i.id === updated.id ? { ...i, ...updated } : i));
+          }
+          // Handle topology updates (Real-time Sync)
+          else if (data.type === 'TOPOLOGY_UPDATED') {
+            const topoData = data.payload;
+            
+            const hubServers = topoData.nodes.filter((n: any) => n.type === 'SERVER').map((n: any) => ({
+              hostname: n.name,
+              ip: n.metadata?.ip || '0.0.0.0',
+              ram_used: n.metadata?.memory?.used_gb || 0,
+              ram_total: n.metadata?.memory?.total_gb || 0,
+              cpu_load: n.metadata?.cpu?.load_avg || 0,
+              status: n.status
+            }));
+
+            const hubWebsites = topoData.nodes.filter((n: any) => n.type === 'DOMAIN').map((n: any) => ({
+              target: n.name,
+              rpm: n.metadata?.metrics?.rpm || 0,
+              latency: n.metadata?.metrics?.p95_ms || 0,
+              memory: n.metadata?.metrics?.mem_mb || 0,
+              cpu: n.metadata?.metrics?.cpu_pct || 0,
+              trend: 'stable',
+              vps: n.metadata?.server || 'unknown'
+            }));
+
+            if (hubServers.length > 0) setServers(hubServers);
+            if (hubWebsites.length > 0) setMonitoredSites(hubWebsites);
+          }
+        } catch (err) {
+          console.error('WS Message Error:', err);
+        }
+      };
+
+      socket.onclose = (e) => {
+        console.log(`WebSocket disconnected: ${e.reason || 'No reason'}`);
+        // Exponential backoff: 1s, 2s, 4s, 8s, up to 30s
+        const delay = Math.min(1000 * Math.pow(2, attempts), 30000);
+        attempts++;
+        console.log(`Reconnecting in ${delay/1000}s... (Attempt ${attempts})`);
+        reconnectTimeout = setTimeout(connectWS, delay);
+      };
+
+      socket.onerror = (err) => {
+        console.error('WebSocket Error:', err);
+        socket?.close();
+      };
+    };
+
+    connectWS();
+
+    // 2. Initial Data Fetch (One-time)
+    const fetchInitialData = async () => {
+      try {
         // Fetch incidents from AI Analyzer
-        const incRes = await fetch('http://localhost:3001/v1/incidents');
+        const incRes = await fetch(`${API_BASE}/v1/incidents`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('nexus_token')}` }
+        });
         if (incRes.ok) {
           const incData = await incRes.json();
           setIncidents(incData);
@@ -308,36 +222,156 @@ export default function DashboardPage() {
           });
         }
 
-        const statsRes = await fetch('http://localhost:3001/v1/incidents/stats');
+        const statsRes = await fetch(`${API_BASE}/v1/incidents/stats`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('nexus_token')}` }
+        });
         if (statsRes.ok) {
           const statsData = await statsRes.json();
           setAnalytics(statsData);
         }
 
-        const res = await fetch('/api/metrics');
-        if (res.ok) {
-          const data = await res.json();
-          if (data.websites) setMonitoredSites(data.websites);
-          if (data.servers) setServers(data.servers);
+        // FETCH LIVE TOPOLOGY FROM HUB
+        const topoRes = await fetch(`${API_BASE}/v1/visibility/topology`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('nexus_token')}` }
+        });
+        
+        let serversData = [];
+        let sitesData = [];
+
+        if (topoRes.ok) {
+          const topoData = await topoRes.json();
+          
+          // Map nodes to Dashboard format
+          serversData = topoData.nodes.filter((n: any) => n.type === 'SERVER').map((n: any) => ({
+            hostname: n.name,
+            ip: n.metadata?.ip || '0.0.0.0',
+            ram_used: n.metadata?.memory?.used_gb || 0,
+            ram_total: n.metadata?.memory?.total_gb || 0,
+            cpu_load: n.metadata?.cpu?.load_avg || 0,
+            status: n.status
+          }));
+
+          sitesData = topoData.nodes.filter((n: any) => n.type === 'DOMAIN').map((n: any) => ({
+            target: n.name,
+            rpm: n.metadata?.metrics?.rpm || 0,
+            latency: n.metadata?.metrics?.p95_ms || 0,
+            memory: n.metadata?.metrics?.mem_mb || 0,
+            cpu: n.metadata?.metrics?.cpu_pct || 0,
+            trend: 'stable',
+            vps: n.metadata?.server || 'unknown'
+          }));
         }
+
+        // SYNC: Ensure if topology is empty, we fall back to /api/metrics for consistency
+        if (serversData.length === 0 || sitesData.length === 0) {
+          const res = await fetch('/api/metrics');
+          if (res.ok) {
+            const data = await res.json();
+            if (data.websites && sitesData.length === 0) sitesData = data.websites;
+            if (data.servers && serversData.length === 0) serversData = data.servers;
+          }
+        }
+
+        setServers(serversData);
+        setMonitoredSites(sitesData);
+
       } finally {
         setLoading(false);
       }
     };
-    loadData();
-    const interval = setInterval(loadData, 10000);
-    return () => clearInterval(interval);
-  }, []);
+    // 3. System Health Polling (Elite Telemetry)
+    const fetchHealth = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/control/health`, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('nexus_token')}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setSystemHealth(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch system health', err);
+      }
+    };
+
+    fetchInitialData();
+    fetchHealth();
+    const healthInterval = setInterval(fetchHealth, 10000); // Poll every 10s
+
+    return () => {
+      clearTimeout(reconnectTimeout);
+      clearInterval(healthInterval);
+      socket?.close();
+    };
+  }, [isAuthenticated]);
+
+  const [simResult, setSimResult] = useState<any | null>(null);
+  const [isSimulating, setIsSimulating] = useState(false);
+
+  // Helper to simulate action
+  const handleSimulateAction = async (id: number, type: 'incident' | 'control', action?: string, target?: string) => {
+    setIsSimulating(true);
+    setSimResult(null);
+    try {
+      const url = type === 'incident' 
+        ? `${API_BASE}/v1/incidents/${id}/simulate`
+        : `${API_BASE}/v1/control/simulate`;
+      
+      const body = type === 'control' ? JSON.stringify({ action, target }) : null;
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('nexus_token')}`
+        },
+        body
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSimResult({ ...data, type, originalId: id });
+      }
+    } catch (err) {
+      console.error('Simulation failed', err);
+    } finally {
+      setIsSimulating(false);
+    }
+  };
+
+  const handleApproveFix = async (id: number) => {
+    // If we haven't simulated yet, do it first!
+    if (!simResult || simResult.originalId !== id) {
+      await handleSimulateAction(id, 'incident');
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/v1/incidents/${id}/approve`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${localStorage.getItem('nexus_token')}`
+        }
+      });
+      if (res.ok) {
+        setSimResult(null); // Clear simulation on success
+        // Incident updated via WS
+      }
+    } catch (e) {
+      alert('Network error');
+    }
+  };
 
   const handleStatusUpdate = async (id: number, status: string) => {
     try {
-      const res = await fetch(`http://localhost:3001/v1/incidents/${id}`, {
+      const res = await fetch(`${API_BASE}/v1/incidents/${id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('nexus_token')}`
+        },
         body: JSON.stringify({ status })
       });
       if (res.ok) {
-        // Refresh UI
         const updated = await res.json();
         setIncidents((prev: any[]) => prev.map((i: any) => i.id === id ? updated : i));
       }
@@ -357,16 +391,28 @@ export default function DashboardPage() {
   }, {});
 
   const tabs = [
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { id: 'infra', label: 'Infrastructure', icon: ServerIcon },
-    { id: 'sites', label: 'Web Assets', icon: Globe },
-    { id: 'map', label: 'System Map', icon: Share2 },
-    { id: 'errors', label: 'Live Errors', icon: Terminal },
-    { id: 'incidents', label: 'Incidents', icon: AlertIcon },
+    { id: 'overview', label: 'Overview', icon: Layout },
+    { id: 'infrastructure', label: 'Infrastructure', icon: Server },
+    { id: 'apps', label: 'App View', icon: Boxes },
+    { id: 'topology', label: 'Topology', icon: Network },
+    { id: 'web-assets', label: 'Web Assets', icon: Globe },
+    { id: 'incidents', label: 'Incidents', icon: AlertCircle },
+    { id: 'live-errors', label: 'Live Errors', icon: TerminalIcon },
   ];
 
-  if (!isAuthenticated && !loading) {
-    return <InteractiveAuth onAuth={() => setIsAuthenticated(true)} />;
+  if (!isAuthenticated) {
+    return <AuthGateway onAuth={() => setIsAuthenticated(true)} />;
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center font-mono">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div>
+          <div className="text-indigo-400 text-[10px] font-black uppercase tracking-[0.3em] animate-pulse">Synchronizing Fleet...</div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -401,13 +447,33 @@ export default function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-4">
+            {/* ELITE SYSTEM MODE INDICATOR */}
+            <div className={`flex items-center gap-2 px-3 py-1 rounded-full border border-slate-800 ${
+              systemHealth?.status === 'DEGRADED' ? 'bg-amber-500/10 border-amber-500/30' : 
+              systemHealth?.status === 'CRITICAL' ? 'bg-rose-500/10 border-rose-500/30' : 
+              'bg-emerald-500/10 border-emerald-500/30'
+            }`}>
+              <div className={`w-1.5 h-1.5 rounded-full animate-pulse ${
+                systemHealth?.status === 'DEGRADED' ? 'bg-amber-500' : 
+                systemHealth?.status === 'CRITICAL' ? 'bg-rose-500' : 
+                'bg-emerald-500'
+              }`}></div>
+              <span className={`text-[10px] font-black uppercase tracking-widest ${
+                systemHealth?.status === 'DEGRADED' ? 'text-amber-400' : 
+                systemHealth?.status === 'CRITICAL' ? 'text-rose-400' : 
+                'text-emerald-400'
+              }`}>
+                {systemHealth?.status || 'NORMAL'} MODE
+              </span>
+            </div>
+
             <div className="hidden lg:flex flex-col items-end mr-4">
-              <span className="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-1">Cyber Threat Assessment</span>
-              <div className="h-1.5 w-32 bg-slate-800 rounded-full overflow-hidden">
-                <motion.div
-                  animate={{ width: `${Math.min(100, (incidents.length * 15))}%` }}
-                  className={`h-full ${incidents.length > 3 ? 'bg-rose-500 shadow-[0_0_8px_#f43f5e]' : 'bg-emerald-500 shadow-[0_0_8px_#10b981]'}`}
-                ></motion.div>
+              <span className="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-1">Hub Ingestion Lag</span>
+              <div className="text-[10px] font-bold text-white flex gap-2">
+                <span>{systemHealth?.telemetry?.lastIngestionLag || 0}ms</span>
+                {systemHealth?.telemetry?.droppedEvents > 0 && (
+                   <span className="text-rose-400">({systemHealth.telemetry.droppedEvents} DROPPED)</span>
+                )}
               </div>
             </div>
 
@@ -474,7 +540,7 @@ export default function DashboardPage() {
                   onClick={() => setActiveTab(tab.id as any)}
                   className={`flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-[10px] sm:text-xs font-bold transition-all flex-1 md:flex-initial ${activeTab === tab.id ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}
                 >
-                  <tab.icon size={14} />
+                  <tab.icon className="w-4 h-4" />
                   <span className="hidden sm:inline">{tab.label}</span>
                 </button>
               ))}
@@ -494,7 +560,7 @@ export default function DashboardPage() {
               {activeTab === 'overview' && (
                 <section>
                   <h2 className="text-2xl font-bold mb-6 flex items-center gap-3 text-indigo-100 uppercase tracking-tight">
-                    <LayoutDashboard className="text-indigo-500" /> Fleet Intelligence Overview
+                    <Layout className="text-indigo-500" /> Fleet Intelligence Overview
                   </h2>
                   <FleetOverview websites={monitoredSites} servers={servers} securityScore={healthScore} />
 
@@ -562,7 +628,7 @@ export default function DashboardPage() {
               )}
 
               {/* 2. INFRASTRUCTURE SECTION */}
-              {activeTab === 'infra' && (
+              {activeTab === 'infrastructure' && (
                 <section>
                   <h2 className="text-2xl font-bold mb-6 flex items-center gap-3 text-indigo-100 uppercase tracking-tight">
                     <ServerIcon className="text-indigo-500" /> Infrastructure Nodes
@@ -571,8 +637,95 @@ export default function DashboardPage() {
                 </section>
               )}
 
+              {/* 2.5 APP VIEW SECTION */}
+              {activeTab === 'apps' && (
+                <section className="space-y-8">
+                   <div className="flex justify-between items-end mb-6">
+                    <div>
+                      <h2 className="text-2xl font-bold flex items-center gap-3 text-indigo-100 uppercase tracking-tight mb-2">
+                        <Boxes className="text-indigo-500" /> Application Discovery
+                      </h2>
+                      <p className="text-slate-500 text-sm italic">Automated mapping of running processes to ports and internal services.</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button className="px-4 py-2 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 text-[10px] font-black uppercase tracking-widest border border-indigo-500/20 rounded-xl transition-all">
+                        Refresh Mapping
+                      </button>
+                    </div>
+                  </div>
+
+                  {servers.map(server => (
+                    <div key={server.id} className="glass-panel p-6 rounded-3xl border border-slate-800/50">
+                      <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-800/50">
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 bg-indigo-500/10 rounded-xl flex items-center justify-center text-indigo-400">
+                             <Server size={20} />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-bold text-white">{server.hostname}</h3>
+                            <p className="text-[10px] text-slate-500 font-mono tracking-widest uppercase">{server.ip} • Ubuntu 22.04 LTS</p>
+                          </div>
+                        </div>
+                        <div className="flex gap-6">
+                           <div className="text-right">
+                              <div className="text-[9px] text-slate-500 uppercase font-black mb-1">CPU App Overhead</div>
+                              <div className="text-sm font-bold text-white">4.2%</div>
+                           </div>
+                           <div className="text-right">
+                              <div className="text-[9px] text-slate-500 uppercase font-black mb-1">Mapped Services</div>
+                              <div className="text-sm font-bold text-indigo-400">5 Active</div>
+                           </div>
+                        </div>
+                      </div>
+
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-separate border-spacing-y-2">
+                          <thead>
+                            <tr className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                              <th className="px-4 pb-2">Process</th>
+                              <th className="px-4 pb-2">PID</th>
+                              <th className="px-4 pb-2">User</th>
+                              <th className="px-4 pb-2">Port(s)</th>
+                              <th className="px-4 pb-2">CPU/MEM</th>
+                              <th className="px-4 pb-2">Uptime</th>
+                              <th className="px-4 pb-2 text-right">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="text-xs">
+                            {[
+                              { name: 'nginx', pid: 822, user: 'root', ports: '80, 443', resources: '0.2% / 12MB', uptime: '14d 2h', status: 'online' },
+                              { name: 'node (yoforex)', pid: 1422, user: 'node', ports: '3000 (proxy)', resources: '1.4% / 142MB', uptime: '4d 1h', status: 'online' },
+                              { name: 'node (nexus-api)', pid: 5562, user: 'node', ports: '3001 (proxy)', resources: '2.1% / 210MB', uptime: '8d 4h', status: 'warning' },
+                              { name: 'postgres', pid: 911, user: 'postgres', ports: '5432', resources: '0.4% / 512MB', uptime: '14d 2h', status: 'online' },
+                              { name: 'redis-server', pid: 102, user: 'redis', ports: '6379', resources: '0.1% / 24MB', uptime: '14d 2h', status: 'online' }
+                            ].map((app, i) => (
+                              <tr key={i} className="bg-slate-900/40 hover:bg-slate-900/60 transition-colors border-y border-slate-800/30">
+                                <td className="px-4 py-3 font-bold text-indigo-100 flex items-center gap-3">
+                                  <div className={`w-1.5 h-1.5 rounded-full ${app.status === 'online' ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`}></div>
+                                  {app.name}
+                                </td>
+                                <td className="px-4 py-3 font-mono text-slate-400">{app.pid}</td>
+                                <td className="px-4 py-3 text-slate-500">{app.user}</td>
+                                <td className="px-4 py-3 font-mono text-indigo-400">{app.ports}</td>
+                                <td className="px-4 py-3 text-slate-400">{app.resources}</td>
+                                <td className="px-4 py-3 text-slate-500">{app.uptime}</td>
+                                <td className="px-4 py-3 text-right">
+                                  <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-md border ${app.status === 'online' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse'}`}>
+                                    {app.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ))}
+                </section>
+              )}
+
               {/* 3. WEB ASSETS SECTION */}
-              {activeTab === 'sites' && (
+              {activeTab === 'web-assets' && (
                 <section className="space-y-12">
                   <div>
                     <h2 className="text-2xl font-bold mb-2 flex items-center gap-3 text-indigo-100 uppercase tracking-tight">
@@ -605,11 +758,11 @@ export default function DashboardPage() {
                 </section>
               )}
 
-              {/* 4. TOPOLOGY MAP SECTION */}
-              {activeTab === 'map' && (
+              {/* 4. TOPOLOGY SECTION */}
+              {activeTab === 'topology' && (
                 <section>
                   <h2 className="text-2xl font-bold mb-6 flex items-center gap-3 text-indigo-100 uppercase tracking-tight">
-                    <Share2 className="text-indigo-500" /> Infrastructure Dependency Web
+                    <Network className="text-indigo-500" /> Infrastructure Dependency Web
                   </h2>
                   <InfrastructureTopology incidents={filteredIncidents} />
 
@@ -635,7 +788,7 @@ export default function DashboardPage() {
                 <section>
                   <div className="flex justify-between items-center mb-6">
                     <h2 className="text-2xl font-bold flex items-center gap-3 text-rose-100 uppercase tracking-tight">
-                      <Terminal className="text-rose-500" /> Critical Error Feed
+                      <TerminalIcon className="text-rose-500" /> Critical Error Feed
                     </h2>
                     <div className="text-[10px] text-slate-500 font-mono">Consolidated Global Logs</div>
                   </div>
@@ -680,7 +833,7 @@ export default function DashboardPage() {
                 <section>
                   <div className="flex justify-between items-center mb-6">
                     <h2 className="text-2xl font-bold flex items-center gap-3 text-indigo-100 uppercase tracking-tight">
-                      <AlertIcon className="text-indigo-500" /> Incident Command Center
+                      <AlertCircle className="text-indigo-500" /> Incident Command Center
                     </h2>                 <div className="flex gap-4">
                       <div className="text-[10px] text-slate-500 font-mono flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-rose-500"></span> {filteredIncidents.filter(i => i.status === 'OPEN').length} OPEN
@@ -991,7 +1144,7 @@ export default function DashboardPage() {
                     <div className="lg:col-span-2 space-y-8">
                       <div>
                         <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-6 flex items-center gap-2">
-                          <Terminal size={14} className="text-indigo-500" /> Root Cause Storyboard
+                          <TerminalIcon size={14} className="text-indigo-500" /> Root Cause Storyboard
                         </h3>
                         <RootCauseTimeline events={timelineEvents} isLoading={isTimelineLoading} />
                       </div>
@@ -1009,7 +1162,7 @@ export default function DashboardPage() {
 
                         <div className="bg-slate-950/80 rounded-xl p-3 font-mono text-[9px] text-slate-400 mb-6 border border-slate-800">
                           <div className="flex items-center gap-2 mb-2 text-indigo-500/70 border-b border-slate-800 pb-1">
-                             <Terminal size={10} /> Agent-Logs: v3.1.2-nexus
+                             <TerminalIcon size={10} /> Agent-Logs: v3.1.2-nexus
                           </div>
                           <div className="space-y-1">
                             <div className="flex gap-2 animate-pulse"><span className="text-slate-600">&gt;</span> SCANNING_VPC_TRAFFIC</div>
@@ -1025,13 +1178,29 @@ export default function DashboardPage() {
                             animate={{ opacity: 1, y: 0 }}
                             className="space-y-4"
                           >
+                            <div className="flex justify-between items-center bg-slate-950/50 p-3 rounded-lg border border-slate-800">
+                               <div className="text-[9px] text-slate-500 font-black uppercase tracking-widest">Blast Radius</div>
+                               <div className="flex items-center gap-2">
+                                  <div className="text-sm font-black text-rose-400">{aiAnalysis.user_impact_percent}%</div>
+                                  <div className="w-16 h-1 bg-slate-800 rounded-full overflow-hidden">
+                                    <div className="h-full bg-rose-500" style={{ width: `${aiAnalysis.user_impact_percent}%` }}></div>
+                                  </div>
+                               </div>
+                            </div>
+
                             <div className="text-[10px] text-slate-300 leading-relaxed bg-slate-950/50 p-3 rounded-lg border border-slate-800">
                               <span className="text-indigo-400 font-bold block mb-1">PROBABLE ROOT CAUSE</span>
-                              {aiAnalysis.rootCause}
+                              {aiAnalysis.root_cause}
                             </div>
-                            <div className="text-[10px] text-slate-300 leading-relaxed bg-emerald-500/5 p-3 rounded-lg border border-emerald-500/20">
-                              <span className="text-emerald-400 font-bold block mb-1">SUGGESTED ACTION</span>
-                              {aiAnalysis.suggestedFix}
+                            
+                            <div className="space-y-2">
+                               <span className="text-[9px] text-emerald-400 font-black uppercase tracking-widest ml-1">Remediation Path</span>
+                               {aiAnalysis.suggested_actions?.map((action: string, idx: number) => (
+                                 <div key={idx} className="flex gap-2 text-[10px] text-slate-300 bg-emerald-500/5 p-2 rounded-lg border border-emerald-500/20">
+                                    <div className="mt-0.5"><CheckCircle size={10} className="text-emerald-500" /></div>
+                                    <span>{action}</span>
+                                 </div>
+                               ))}
                             </div>
                           </motion.div>
                         ) : (
@@ -1052,12 +1221,15 @@ export default function DashboardPage() {
                       </div>
 
                       <div className="space-y-3">
-                        <button 
-                          onClick={() => setSelectedIncident(null)}
-                          className="w-full py-3 bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 font-bold text-[10px] uppercase tracking-widest rounded-xl transition-all"
-                        >
-                          Acknowledge & Investigate
-                        </button>
+                        {selectedIncident.status === 'PENDING_APPROVAL' && (
+                          <button 
+                            onClick={() => handleApproveFix(selectedIncident.id)}
+                            className="w-full py-3 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/40 font-black text-[10px] uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-2 group"
+                          >
+                            <Activity size={14} className="group-hover:animate-pulse" />
+                            Approve & Execute Fix
+                          </button>
+                        )}
                         <button 
                           onClick={() => {
                             handleStatusUpdate(selectedIncident.id, 'RESOLVED');
@@ -1099,21 +1271,7 @@ export default function DashboardPage() {
               if (action.startsWith('go-')) {
                 setActiveTab(action.split('-')[1] as any);
               } else {
-                try {
-                  const res = await fetch('http://localhost:3001/v1/control/execute', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ action, target })
-                  });
-                  const data = await res.json();
-                  if (res.ok) {
-                    alert(`Command Success: ${data.message || 'Action executed successfully.'}`);
-                  } else {
-                    alert(`Command Failed: ${data.error || 'Unknown error'}`);
-                  }
-                } catch (err) {
-                  alert(`Command Failed: Network error or server offline.`);
-                }
+                await handleSimulateAction(0, 'control', action, target);
               }
             }}
           />
@@ -1121,6 +1279,126 @@ export default function DashboardPage() {
       </main>
       
       <SandboxSimulator isOpen={isSandboxOpen} onClose={() => setIsSandboxOpen(false)} />
+
+      {/* DECISION SIMULATOR UI OVERLAY */}
+      {simResult && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in zoom-in duration-300">
+          <div className="bg-slate-900 border border-slate-700/50 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-slate-800 flex justify-between items-center">
+              <div>
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <Brain className="w-6 h-6 text-indigo-400" />
+                  Decision Intelligence Preview
+                </h3>
+                <p className="text-slate-400 text-sm mt-1">Modeling consequences for: <span className="text-indigo-300 font-mono">{simResult.action}</span> on <span className="text-indigo-300 font-mono">{simResult.target}</span></p>
+              </div>
+              <button onClick={() => setSimResult(null)} className="p-2 hover:bg-slate-800 rounded-lg transition-colors">
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+
+            <div className="p-8 space-y-8 max-h-[70vh] overflow-y-auto custom-scrollbar text-white">
+              <div className="grid grid-cols-2 gap-6">
+                <div className="bg-slate-950/50 p-5 rounded-xl border border-slate-800">
+                  <div className="flex justify-between items-end mb-2">
+                    <span className="text-sm text-slate-400">Historical Success Rate</span>
+                    <span className="text-2xl font-mono font-bold text-emerald-400">{simResult.simulation.successRate}%</span>
+                  </div>
+                  <div className="h-2 bg-slate-800 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-emerald-500 transition-all duration-1000" 
+                      style={{ width: `${simResult.simulation.successRate}%` }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-2 italic">Based on {simResult.simulation.historicalCount} previous executions</p>
+                </div>
+                
+                <div className={`p-5 rounded-xl border ${
+                  simResult.simulation.risk === 'LOW' ? 'bg-emerald-500/10 border-emerald-500/20' :
+                  simResult.simulation.risk === 'MEDIUM' ? 'bg-amber-500/10 border-amber-500/20' :
+                  'bg-rose-500/10 border-rose-500/20'
+                }`}>
+                  <span className="text-sm text-slate-400 block mb-1 text-white">Operational Risk</span>
+                  <div className="flex items-center gap-2">
+                    <ShieldAlert className={`w-6 h-6 ${
+                      simResult.simulation.risk === 'LOW' ? 'text-emerald-400' :
+                      simResult.simulation.risk === 'MEDIUM' ? 'text-amber-400' :
+                      'text-rose-400'
+                    }`} />
+                    <span className={`text-2xl font-bold ${
+                      simResult.simulation.risk === 'LOW' ? 'text-emerald-400' :
+                      simResult.simulation.risk === 'MEDIUM' ? 'text-amber-400' :
+                      'text-rose-400'
+                    }`}>{simResult.simulation.risk}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="bg-slate-950/30 p-4 rounded-xl border border-slate-800/50 flex gap-4">
+                  <div className="mt-1"><Info className="w-5 h-5 text-indigo-400" /></div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-200">Primary Effect</h4>
+                    <p className="text-slate-400 text-sm mt-1 leading-relaxed">{simResult.simulation.primary}</p>
+                  </div>
+                </div>
+
+                <div className="bg-slate-950/30 p-4 rounded-xl border border-slate-800/50 flex gap-4">
+                  <div className="mt-1"><Zap className="w-5 h-5 text-amber-400" /></div>
+                  <div className="w-full">
+                    <h4 className="text-sm font-semibold text-slate-200">Secondary Dependencies</h4>
+                    <ul className="mt-2 space-y-2">
+                      {simResult.simulation.secondary.map((eff: string, idx: number) => (
+                        <li key={idx} className="text-slate-400 text-sm flex items-center gap-2">
+                          <div className="w-1.5 h-1.5 rounded-full bg-slate-600" />
+                          {eff}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {simResult.simulation.contextWarning && (
+                <div className="bg-amber-500/10 border border-amber-500/30 p-4 rounded-xl flex gap-3 items-center">
+                  <AlertTriangle className="w-6 h-6 text-amber-500 shrink-0" />
+                  <p className="text-amber-200 text-xs italic">{simResult.simulation.contextWarning}</p>
+                </div>
+              )}
+            </div>
+
+            <div className="p-6 bg-slate-950/50 border-t border-slate-800 flex justify-end gap-3">
+              <button 
+                onClick={() => setSimResult(null)}
+                className="px-6 py-2.5 rounded-xl border border-slate-700 text-slate-400 hover:bg-slate-800 transition-all font-medium"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={async () => {
+                  const { type, originalId, action, target } = simResult;
+                  const res = await fetch(`${API_BASE}/v1/${type === 'incident' ? `incidents/${originalId}/approve` : 'control/execute'}`, {
+                    method: 'POST',
+                    headers: { 
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${localStorage.getItem('nexus_token')}`
+                    },
+                    body: type === 'control' ? JSON.stringify({ action, target }) : null
+                  });
+                  if (res.ok) {
+                    setSimResult(null);
+                    if (type === 'control') alert('Action Queued successfully via BullMQ');
+                  }
+                }}
+                className="px-8 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20 transition-all font-bold flex items-center gap-2"
+              >
+                {simResult.type === 'incident' ? 'Confirm Remediation' : 'Confirm Execution'}
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

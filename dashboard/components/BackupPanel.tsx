@@ -30,12 +30,16 @@ export default function BackupPanel() {
   const [backupMessages, setBackupMessages] = useState<Record<string, string>>({});
 
   const handleBackup = async (siteId: string, dbName: string) => {
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
     setBackupStatuses(prev => ({ ...prev, [siteId]: 'loading' }));
     try {
-      const res = await fetch('http://localhost:3001/v1/control/backup', {
+      const res = await fetch(`${API_BASE}/v1/control/backup`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target: dbName })
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('nexus_token')}`
+        },
+        body: JSON.stringify({ target: 'postgresql' })
       });
       
       const data = await res.json();

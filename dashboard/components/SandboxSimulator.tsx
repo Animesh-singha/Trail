@@ -8,9 +8,10 @@ export default function SandboxSimulator({ isOpen, onClose }: { isOpen: boolean,
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
 
   const simulateAttack = async (type: string, node: string) => {
+    const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
     setLoadingAction(type);
     try {
-      const res = await fetch('http://localhost:3001/v1/sandbox/trigger-incident', {
+      const res = await fetch(`${API_BASE}/v1/sandbox/trigger-incident`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ attackType: type, targetNode: node })
