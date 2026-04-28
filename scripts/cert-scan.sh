@@ -9,8 +9,8 @@ METRICS_FILE="$TARGET_DIR/certs.prom"
 echo "# HELP ssl_certificate_expiry_days Days until SSL certificate expires" > $METRICS_FILE
 echo "# TYPE ssl_certificate_expiry_days gauge" >> $METRICS_FILE
 
-# Use certbot to get certificate info
-# We parse the output to get Domain and Expiry
+# Use certbot to get certificate info (with sudo)
+COUNT=0
 while read -r line; do
     if [[ $line == *"Certificate Name:"* ]]; then
         DOMAIN=$(echo $line | awk '{print $3}')
@@ -24,7 +24,8 @@ while read -r line; do
         
         # Write to metrics file
         echo "ssl_certificate_expiry_days{domain=\"$DOMAIN\"} $DIFF" >> $METRICS_FILE
+        COUNT=$((COUNT + 1))
     fi
-done < <(certbot certificates 2>/dev/null)
+done < <(sudo certbot certificates 2>/dev/null)
 
-echo "Certificates updated at $(date)"
+echo "✅ [SUCCESS] $COUNT Certificates scanned and updated at $(date)"
