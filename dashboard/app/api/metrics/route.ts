@@ -32,17 +32,24 @@ export async function GET(req: NextRequest) {
 
     // 2. Fetch Real Website Metrics from Blackbox Exporter
     const latencyRes = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=probe_duration_seconds * 1000`);
+    const sslRes = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=probe_ssl_earliest_cert_expiry`);
+    
     const latencyData = await latencyRes.json();
+    const sslData = await sslRes.json();
 
-    const websites = (latencyData.data?.result || []).map((res: any) => ({
-      target: res.metric.instance || 'Unknown',
-      rpm: 0, 
-      latency: Math.round(parseFloat(res.value[1])),
-      memory: 0, 
-      cpu: 0,    
-      trend: 'stable',
-      vps: 'Local-Fleet'
-    }));
+    const websites = (latencyData.data?.result || []).map((res: any, idx: number) => {
+      const sslVal = sslData.data?.result.find((s: any) => s.metric.instance === res.metric.instance)?.value[1];
+      const sslDays = sslVal ? Math.floor((parseFloat(sslVal) - Date.now() / 1000) / 86400) : null;
+
+      return {
+        target: res.metric.instance || 'Unknown',
+        rpm: 0, 
+        latency: Math.round(parseFloat(res.value[1])),
+        ssl_days: sslDays,
+        trend: 'stable',
+        vps: 'Local-Fleet'
+      };
+    });
 
     // 3. Fetch Real Container Metrics (cAdvisor)
     const containerRes = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=container_memory_usage_bytes{name!=""}`);

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Activity, Cpu, Database, Globe, MemoryStick as Memory, Zap, MoreVertical, RefreshCw, Trash2, Download, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Activity, Cpu, Database, Globe, MemoryStick as Memory, Zap, MoreVertical, RefreshCw, Trash2, Download, CheckCircle2, AlertCircle, ShieldCheck, ShieldAlert } from 'lucide-react';
 
 interface SiteCardProps {
   target: string;
@@ -110,6 +110,17 @@ export default function SiteCard({ target, vps, onClick }: SiteCardProps) {
               <span className="w-1 h-1 rounded-full bg-emerald-400 animate-pulse"></span>
               ONLINE
            </div>
+
+           {metrics?.ssl_days !== undefined && (
+             <div className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[9px] font-black ${
+               metrics.ssl_days > 15 
+               ? 'bg-blue-500/10 border-blue-500/30 text-blue-400' 
+               : 'bg-rose-500/10 border-rose-500/30 text-rose-400 animate-pulse'
+             }`}>
+               {metrics.ssl_days > 15 ? <ShieldCheck size={10} /> : <ShieldAlert size={10} />}
+               SSL: {metrics.ssl_days > 0 ? `${metrics.ssl_days}D` : 'EXPIRED'}
+             </div>
+           )}
            
            <div className="relative z-50">
               <button 
