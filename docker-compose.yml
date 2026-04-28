@@ -153,6 +153,8 @@ services:
     build: ./pm2-exporter
     container_name: trail-pm2-exporter-1
     restart: unless-stopped
+    environment:
+      - PM2_HOME=/root/.pm2
     ports:
       - "9209:9209"
     volumes:
