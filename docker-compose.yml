@@ -150,7 +150,7 @@ services:
 
   # --- PM2 DISCOVERY AGENT (Auto-detects your backend apps) ---
   pm2-exporter:
-    image: panosmtop/pm2-exporter:latest
+    build: ./pm2-exporter
     container_name: trail-pm2-exporter-1
     restart: unless-stopped
     ports:
