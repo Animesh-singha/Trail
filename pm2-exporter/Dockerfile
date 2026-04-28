@@ -7,5 +7,4 @@ RUN npm install -g pm2 pm2-prometheus-exporter
 EXPOSE 9209
 
 # Command to run the exporter
-# We use 'pm2-prometheus-exporter' directly as a binary
-CMD ["pm2-prometheus-exporter"]
+CMD ["npx", "-y", "pm2-prometheus-exporter"]
