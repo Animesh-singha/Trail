@@ -150,10 +150,15 @@ services:
 
   # --- PM2 DISCOVERY AGENT (Auto-detects your backend apps) ---
   pm2-exporter:
-    build: ./pm2-exporter
+    image: saulmaldonado/pm2-exporter:latest
+    container_name: trail-pm2-exporter-1
     restart: unless-stopped
+    ports:
+      - "9209:9209"
     volumes:
-      - /home/ubuntu/.pm2:/root/.pm2:ro
+      - /home/ubuntu/.pm2:/home/ubuntu/.pm2:ro
+    environment:
+      - PM2_HOME=/home/ubuntu/.pm2
     networks:
       - nexus-net
 
