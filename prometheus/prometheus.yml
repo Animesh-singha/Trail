@@ -22,7 +22,7 @@ scrape_configs:
   # 2. Monitor the AI Hub (Nexus Hub)
   - job_name: 'nexus-hub'
     static_configs:
-      - targets: ['nexus-hub:3001']
+      - targets: ['nexus-hub:3111']
 
   # 3. Monitor External Websites (Blackbox)
   - job_name: 'uptime-monitoring'
@@ -31,8 +31,7 @@ scrape_configs:
       module: [http_2xx]
     static_configs:
       - targets:
-        # ADD YOUR REAL WEB APP URLS HERE (e.g., https://yourdomain.com)
-        - https://www.google.com 
+        - https://yoforex.net
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
@@ -40,11 +39,6 @@ scrape_configs:
         target_label: instance
       - target_label: __address__
         replacement: blackbox-exporter:9115
-
-  # 4. Monitor Containers (cAdvisor)
-  - job_name: 'cadvisor'
-    static_configs:
-      - targets: ['cadvisor:8080']
 
   # 5. Monitor Database (Postgres Exporter)
   - job_name: 'postgres-exporter'
