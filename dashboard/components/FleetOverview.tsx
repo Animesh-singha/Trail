@@ -22,6 +22,8 @@ export default function FleetOverview({ websites, servers, containers = [], dbSt
     { label: 'Database Health', value: dbStatus, icon: Server, color: dbStatus === 'Healthy' ? 'text-emerald-400' : 'text-rose-400' },
   ];
 
+  const sslSite = websites.find(w => w.ssl_days !== null);
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-12">
       {/* Visual Charts Container */}
@@ -94,8 +96,10 @@ export default function FleetOverview({ websites, servers, containers = [], dbSt
                      <div className="text-sm font-bold text-slate-200">24ms</div>
                   </div>
                   <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-800">
-                     <div className="text-[8px] text-slate-500 uppercase font-black mb-1">Active Containers</div>
-                     <div className="text-sm font-bold text-slate-200">{containers.length}</div>
+                     <div className="text-[8px] text-slate-500 uppercase font-black mb-1">Security Pulse</div>
+                     <div className={`text-[10px] font-bold ${sslSite ? 'text-emerald-400' : 'text-slate-500'}`}>
+                        {sslSite ? `SSL OK: ${sslSite.ssl_days}D` : 'SCANNING SSL...'}
+                     </div>
                   </div>
                </div>
             </div>
