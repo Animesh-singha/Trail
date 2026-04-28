@@ -125,7 +125,7 @@ services:
       context: ./ai-analyzer
     restart: unless-stopped
     ports:
-      - "3111:3001"
+      - "3111:3111"
     volumes:
       - ./ai-analyzer:/app
       - /app/node_modules
@@ -148,8 +148,8 @@ services:
     build:
       context: ./dashboard
       args:
-        - NEXT_PUBLIC_API_URL=http://localhost:3111
-        - NEXT_PUBLIC_AI_HUB_URL=http://localhost:3111
+        - NEXT_PUBLIC_API_URL=http://37.187.159.136:3111
+        - NEXT_PUBLIC_AI_HUB_URL=http://37.187.159.136:3111
     restart: unless-stopped
     ports:
       - "3200:3000" # Safe port mapped from 3000 to 3200
@@ -158,9 +158,9 @@ services:
       - /app/node_modules
       - /app/.next
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:3111
-      - NEXT_PUBLIC_AI_HUB_URL=http://localhost:3111
-      - NEXT_PUBLIC_PROMETHEUS_URL=http://localhost:9090
+      - NEXT_PUBLIC_API_URL=http://37.187.159.136:3111
+      - NEXT_PUBLIC_AI_HUB_URL=http://37.187.159.136:3111
+      - NEXT_PUBLIC_PROMETHEUS_URL=http://37.187.159.136:9090
       - PROMETHEUS_URL=http://prometheus:9090
     networks:
       - nexus-net
