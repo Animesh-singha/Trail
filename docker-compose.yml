@@ -58,8 +58,16 @@ services:
       - '--path.procfs=/host/proc'
       - '--path.sysfs=/host/sys'
       - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
+      - '--collector.textfile.directory=/etc/node-exporter'
     ports:
       - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+      - ./monitoring/metrics:/etc/node-exporter
+      - ./scripts:/app/scripts
+      - /etc/letsencrypt:/etc/letsencrypt:ro
     networks:
       - nexus-net
 
@@ -153,6 +161,7 @@ services:
     build: ./pm2-exporter
     container_name: trail-pm2-exporter-1
     restart: unless-stopped
+    pid: "host" # Crucial: Allows seeing all host processes
     environment:
       - PM2_HOME=/root/.pm2
     ports:

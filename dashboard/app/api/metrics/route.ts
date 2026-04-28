@@ -32,22 +32,20 @@ export async function GET(req: NextRequest) {
 
     // 2. Fetch Real Website Metrics from Blackbox Exporter
     const latencyRes = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=probe_duration_seconds * 1000`);
-    const sslRes = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=probe_ssl_earliest_cert_expiry`);
-    
-    const latencyData = await latencyRes.json();
-    const sslData = await sslRes.json();
+    // 2. Fetch Automated SSL Cert Data from Cert-Scan
+    const autoSslRes = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=ssl_certificate_expiry_days`);
+    const autoSslData = await autoSslRes.json();
 
-    const websites = (latencyData.data?.result || []).map((res: any, idx: number) => {
-      const sslVal = sslData.data?.result.find((s: any) => s.metric.instance === res.metric.instance)?.value[1];
-      const sslDays = sslVal ? Math.floor((parseFloat(sslVal) - Date.now() / 1000) / 86400) : null;
-
+    // Merge everything into monitored sites
+    const websites = (autoSslData.data?.result || []).map((res: any) => {
+      const domain = res.metric.domain;
+      const sslDays = parseInt(res.value[1]);
       return {
-        target: res.metric.instance || 'Unknown',
-        rpm: 0, 
-        latency: Math.round(parseFloat(res.value[1])),
+        target: domain,
+        status: sslDays > 0 ? 'online' : 'offline',
+        latency: 'N/A', // Latency is for network probes, this is cert status
         ssl_days: sslDays,
-        trend: 'stable',
-        vps: 'Local-Fleet'
+        vps: 'yoforex-main'
       };
     });
 
