@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
 
   try {
     // 1. Fetch Real Server Metrics from Node Exporter
-    const cpuRes = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)`);
+    const cpuRes = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[1m])) * 100)`);
     const memRes = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100`);
     const diskRes = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=(1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) * 100`);
     
