@@ -38,6 +38,8 @@ export const visibilityRoutes = async (server: FastifyInstance) => {
       server.log.error(err);
       return reply.code(500).send({ error: 'Failed to fetch snapshots' });
     }
+  });
+
   // Get File Integrity Audit Logs
   server.get('/visibility/integrity', { preHandler: [requirePermission(Permission.VIEW_TOPOLOGY)] }, async (request, reply) => {
     try {
