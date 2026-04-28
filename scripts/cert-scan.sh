@@ -1,8 +1,9 @@
 #!/bin/bash
 
-# Directory for Prometheus textfile collector
-TARGET_DIR="/app/monitoring/metrics"
-mkdir -p $TARGET_DIR
+# Directory for Prometheus textfile collector (Host side)
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+TARGET_DIR="$SCRIPT_DIR/../monitoring/metrics"
+mkdir -p "$TARGET_DIR"
 
 METRICS_FILE="$TARGET_DIR/certs.prom"
 echo "# HELP ssl_certificate_expiry_days Days until SSL certificate expires" > $METRICS_FILE
