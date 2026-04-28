@@ -112,6 +112,7 @@ services:
       - ./ai-analyzer:/app
       - /app/node_modules
     environment:
+      - PORT=3111
       - DB_HOST=postgres
       - DB_USER=nexus_user
       - DB_PASSWORD=YoForex@101

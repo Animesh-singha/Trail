@@ -46,7 +46,12 @@ server.addHook('onResponse', (request, reply, done) => {
 });
 
 // Middleware & Plugins
-server.register(cors);
+server.register(cors, {
+  origin: true, // Allow all origins
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+});
 server.register(cookie);
 server.register(rateLimit, {
   max: 100,
