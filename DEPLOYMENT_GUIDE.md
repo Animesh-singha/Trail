@@ -68,7 +68,23 @@ sudo apt install postgresql-client -y
 
 ---
 
-## STEP 6 — Install Git and Clone the Project
+## STEP 6 — Install Redis (Required for Asynchronous Actions)
+```bash
+sudo apt install redis-server -y
+sudo systemctl enable redis-server
+sudo systemctl start redis-server
+```
+**What this does:** Installs Redis, which stores the "Job Queue" for the SOC. This allows the backend to handle long-running tasks like backups and AI remediation without slowing down the dashboard.
+
+Verify it is running:
+```bash
+redis-cli ping
+# Should print: PONG
+```
+
+---
+
+## STEP 7 — Install Git and Clone the Project
 ```bash
 sudo apt install git -y
 git clone https://github.com/Animesh-singha/project-M.git
@@ -86,7 +102,11 @@ nano .env
 ```
 **What this does:** Opens your environment config file. Change the following values:
 - `DB_HOST` → Your PostgreSQL server IP (already `100.97.103.94`)
-- `AI_PROVIDER_API_KEY` → Your Gemini API Key (already set)
+- `JWT_SECRET` → A long random string (REQUIRED for session security)
+- `SEED_USER` / `SEED_PASS` → Your initial admin credentials
+- `AI_PROVIDER_API_KEY` → Your Gemini API Key
+- `REDIS_HOST` → `localhost` (if you installed it in Step 6)
+- `REDIS_PORT` → `6379`
 - `NOTIFY_EMAIL` → Your email for alerts
 
 Press `Ctrl + X`, then `Y`, then `Enter` to save.
@@ -154,6 +174,12 @@ sudo ufw allow 3100    # Loki (internal)
 sudo ufw enable
 ```
 **What this does:** Opens the necessary ports on your server's firewall so your browser can reach the dashboard.
+
+### 🛡️ Production Security Checklist (CRITICAL)
+1. **Change SEED_PASS**: Ensure your seed admin password is set to a secure unique string.
+2. **Rotate JWT_SECRET**: Use a 64+ character string for production.
+3. **Redis Security**: If using Redis, ensure it is binded to localhost or protected by a strong password.
+4. **Agent Transition**: For high-security environments, prepare to transition from direct SSH to the **Nexus Agent** (Coming in Phase 5).
 
 ---
 
@@ -404,6 +430,40 @@ sudo systemctl restart prometheus
 
 ## STEP 20 — Repeat for Every Other VPS
 Go back to **Step 15** and repeat Steps 15–19 for each additional VPS/VDS you want to monitor. Each time, just add the new IP to the Prometheus targets list in Step 19.
+
+---
+
+---
+
+## STEP 21 — Deploy the Nexus Discovery Agent (Real-time Topology)
+*Run these commands on every target VPS to enable the "X-Ray Vision" map in the dashboard.*
+
+```bash
+# 1. SSH into the Target VPS
+ssh root@YOUR_TARGET_VPS_IP
+
+# 2. Copy the agent folder from the main server or clone it
+# (Assuming you already have the repo on the VPS from Step 7)
+cd ~/project-M/agent
+
+# 3. Install dependencies
+npm install
+
+# 4. Configure the agent
+cp .env.example .env
+nano .env
+```
+Update the following:
+- `NEXUS_HUB_URL` → `http://YOUR_MAIN_SERVER_IP:3001`
+- `NEXUS_AGENT_TOKEN` → Must match your `ai-analyzer` `.env` token.
+
+```bash
+# 5. Start the agent permanently
+pm2 start index.js --name nexus-agent
+pm2 save
+```
+
+**What this does:** The agent will now push your processes, ports, and domains to the dashboard every 60 seconds. You will see your server appear automatically in the **Topology** tab.
 
 ---
 

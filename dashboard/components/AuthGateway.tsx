@@ -95,10 +95,10 @@ export default function AuthGateway({ onAuth }: AuthGatewayProps) {
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="w-full max-w-md bg-slate-900/50 border border-indigo-500/30 rounded-3xl p-8 backdrop-blur-2xl shadow-[0_0_50px_rgba(79,70,229,0.1)] relative"
+        className="w-full max-w-md bg-slate-950/50 border border-slate-500/30 rounded-3xl p-8 backdrop-blur-2xl shadow-[0_0_50px_rgba(255,255,255,0.05)] relative"
       >
         <div className="flex justify-center mb-8">
-          <div className="p-4 bg-indigo-500/10 rounded-2xl border border-indigo-500/20 text-indigo-400 relative">
+          <div className="p-4 bg-slate-500/10 rounded-2xl border border-slate-500/20 text-slate-400 relative">
             <ShieldAlert size={40} className={status === 'checking' ? 'animate-pulse' : ''} />
             {status === 'success' && (
               <motion.div
@@ -112,11 +112,11 @@ export default function AuthGateway({ onAuth }: AuthGatewayProps) {
           </div>
         </div>
 
-        <div className="space-y-2 mb-8 bg-black/40 p-4 rounded-xl border border-slate-800 text-[10px] text-indigo-300 h-32 overflow-y-auto scrollbar-hide flex flex-col-reverse">
+        <div className="space-y-2 mb-8 bg-black/40 p-4 rounded-xl border border-slate-800 text-[10px] text-slate-400 h-32 overflow-y-auto scrollbar-hide flex flex-col-reverse">
           <div className="flex flex-col">
             {terminalLines.map((line, i) => (
               <div key={i} className="flex gap-2">
-                <span className="text-indigo-500/50">[{mounted ? new Date().toLocaleTimeString([], { hour12: false }) : '--:--:--'}]</span>
+                <span className="text-slate-500/50">[{mounted ? new Date().toLocaleTimeString([], { hour12: false }) : '--:--:--'}]</span>
                 <span className={line.includes('DENIED') ? 'text-rose-400 font-bold' : line.includes('GRANTED') ? 'text-emerald-400 font-bold' : ''}>
                   {line}
                 </span>
@@ -136,7 +136,7 @@ export default function AuthGateway({ onAuth }: AuthGatewayProps) {
                 if (status === 'error') setStatus('idle');
               }}
               placeholder="USER ID"
-              className="w-full bg-slate-950/80 border border-slate-800 focus:border-indigo-500 rounded-xl px-4 py-3 text-sm text-white outline-none transition-all"
+              className="w-full bg-slate-950/80 border border-slate-800 focus:border-slate-500 rounded-xl px-4 py-3 text-sm text-white outline-none transition-all"
               autoFocus
             />
           </div>
@@ -151,12 +151,12 @@ export default function AuthGateway({ onAuth }: AuthGatewayProps) {
                   if (status === 'error') setStatus('idle');
                 }}
                 placeholder="PASSWORD"
-                className={`w-full bg-slate-950/80 border ${status === 'error' ? 'border-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.2)]' : 'border-slate-800 focus:border-indigo-500'} rounded-xl px-4 py-3 text-sm text-white outline-none transition-all pr-12`}
+                className={`w-full bg-slate-950/80 border ${status === 'error' ? 'border-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.2)]' : 'border-slate-800 focus:border-slate-500'} rounded-xl px-4 py-3 text-sm text-white outline-none transition-all pr-12`}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-indigo-400 transition-colors"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-400 transition-colors"
                 title={showPassword ? "Hide Password" : "Show Password"}
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -176,7 +176,7 @@ export default function AuthGateway({ onAuth }: AuthGatewayProps) {
           <button
             type="submit"
             disabled={status === 'checking' || !username || !password}
-            className="w-full mt-4 py-4 bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 text-white font-black text-xs uppercase tracking-[0.2em] rounded-xl transition-all shadow-lg shadow-indigo-500/20 active:scale-95"
+            className="w-full mt-4 py-4 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white font-black text-xs uppercase tracking-[0.2em] rounded-xl transition-all shadow-lg shadow-black/20 active:scale-95 border border-slate-700/50"
           >
             {status === 'checking' ? 'Processing...' : 'Authorize Access'}
           </button>

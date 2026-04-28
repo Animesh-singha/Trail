@@ -31,7 +31,10 @@ yarn-debug.log*
 yarn-error.log*
 lerna-debug.log*
 
-# AI-Analyzer specific
-dist/
-logs/
+# Infrastructure Data (NEVER COMMIT)
+backups/
+postgres/archive/
+*.dump
 data/
+logs/
+dist/

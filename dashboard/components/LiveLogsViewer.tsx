@@ -46,16 +46,8 @@ export default function LiveLogsViewer({ className = "", target = "", siteName =
         }
 
       } catch (error) {
-        // Sandbox fallbacks
-        if (logs.length === 0) {
-            setLogs([
-              { ts: Date.now().toString() + "000000", log: `[SYSTEM] Handshake with ${siteName}...` },
-              { ts: (Date.now() - 1000).toString() + "000000", log: `[SECURITY] TLS 1.3 session established.` }
-            ]);
-        }
-        if (!metrics) {
-            setMetrics({ rpm: 120, latency: 45, memory: 850, cpu: 12, trend: 'stable' });
-        }
+        console.error('Log Retrieval Error:', error);
+        // NO FALLBACKS ALLOWED - We show empty state if real data is missing
       } finally {
         setLoading(false);
       }

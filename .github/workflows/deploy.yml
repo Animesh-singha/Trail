@@ -1,0 +1,26 @@
+name: Deploy Nexus SOC to VPS
+
+on:
+  push:
+    branches: [ main ] # Triggered every time you push to 'main'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v0.1.10
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd ~/nexus-soc
+            git pull origin main
+            # Restart only the services that changed
+            docker-compose up -d --build
+            # Cleanup old images to save disk space
+            docker image prune -f

@@ -2,39 +2,37 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
+# Alerting rules configuration
 rule_files:
-  - "rules/*.yml"
+  - "rules.yml"
 
+# Alertmanager configuration
 alerting:
   alertmanagers:
     - static_configs:
-        - targets: ['alertmanager:9093']
-
-remote_write:
-  - url: "http://victoriametrics:8428/api/v1/write"
+        - targets:
+          - alertmanager:9093
 
 scrape_configs:
-  - job_name: 'prometheus'
+  # 1. Monitor the VPS Infrastructure
+  - job_name: 'node-exporter'
     static_configs:
-      - targets: ['localhost:9090']
+      - targets: ['node-exporter:9100']
 
-  - job_name: 'node_exporter'
+  # 2. Monitor the AI Hub (Nexus Hub)
+  - job_name: 'nexus-hub'
     static_configs:
-      # Placeholder for target servers
-      - targets: ['target1:9100', 'target2:9100']
+      - targets: ['nexus-hub:3001']
 
-  - job_name: 'postgres_exporter'
-    static_configs:
-      # Placeholder for target servers
-      - targets: ['target1:9187', 'target2:9187']
-
-  - job_name: 'blackbox'
+  # 3. Monitor External Websites (Blackbox)
+  - job_name: 'uptime-monitoring'
     metrics_path: /probe
     params:
       module: [http_2xx]
     static_configs:
       - targets:
-        - https://example.com # Example uptime check
+        # ADD YOUR REAL WEB APP URLS HERE (e.g., https://yourdomain.com)
+        - https://www.google.com 
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target
@@ -42,3 +40,17 @@ scrape_configs:
         target_label: instance
       - target_label: __address__
         replacement: blackbox-exporter:9115
+
+  # 4. Monitor Containers (cAdvisor)
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+
+  # 5. Monitor Database (Postgres Exporter)
+  - job_name: 'postgres-exporter'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+
+  - job_name: 'pm2-exporter'
+    static_configs:
+      - targets: ['pm2-exporter:9209']

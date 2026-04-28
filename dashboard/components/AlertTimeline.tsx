@@ -8,22 +8,15 @@ interface AlertTimelineProps {
 }
 
 export default function AlertTimeline({ incidents }: AlertTimelineProps) {
-  // Mock some system events for density
-  const systemEvents = [
-    { id: 's1', type: 'system', alert_name: 'Nginx Configuration Reloaded', service: 'vps-lon-01', timestamp: new Date(Date.now() - 500000).toISOString(), severity: 'INFO' },
-    { id: 's2', type: 'system', alert_name: 'Database Backup Completed', service: 'all-nodes', timestamp: new Date(Date.now() - 1200000).toISOString(), severity: 'SUCCESS' },
-  ];
-
   const allEvents = [
-    ...incidents.map(i => ({ ...i, type: 'incident' })),
-    ...systemEvents
+    ...incidents.map(i => ({ ...i, type: 'incident' }))
   ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
   return (
     <div className="glass-panel p-6 rounded-2xl h-full flex flex-col">
       <div className="flex justify-between items-center mb-6">
         <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] flex items-center gap-2">
-          <Clock size={12} className="text-indigo-500" /> Operational Alert Feed
+          <Clock size={12} className="text-slate-500" /> Operational Alert Feed
         </h3>
         <span className="text-[9px] font-bold text-slate-600 uppercase">Live (50ms pol)</span>
       </div>
@@ -69,7 +62,7 @@ export default function AlertTimeline({ incidents }: AlertTimelineProps) {
       </div>
 
       <div className="mt-6 pt-4 border-t border-slate-800/50">
-        <button className="w-full text-[9px] font-black text-slate-500 hover:text-indigo-400 uppercase tracking-widest transition-colors">
+        <button className="w-full text-[9px] font-black text-slate-500 hover:text-white uppercase tracking-widest transition-colors">
           View Audit History →
         </button>
       </div>

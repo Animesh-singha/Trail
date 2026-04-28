@@ -90,17 +90,17 @@ export default function SiteCard({ target, vps, onClick }: SiteCardProps) {
       onClick={onClick}
       whileHover={{ y: -4, scale: 1.01 }}
       whileTap={{ scale: 0.98 }}
-      className="glass-panel p-5 rounded-2xl border border-slate-700/50 hover:border-indigo-500/50 transition-all cursor-pointer group relative overflow-hidden"
+      className="glass-panel p-5 rounded-2xl border border-slate-800 hover:border-slate-500 transition-all cursor-pointer group relative overflow-hidden"
     >
-      <div className="absolute -right-4 -top-4 w-24 h-24 bg-indigo-500/5 blur-3xl rounded-full group-hover:bg-indigo-500/10 transition-all"></div>
+      <div className="absolute -right-4 -top-4 w-24 h-24 bg-white/5 blur-3xl rounded-full group-hover:bg-white/10 transition-all"></div>
       
       <div className="flex justify-between items-start mb-6">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-slate-800 rounded-xl group-hover:bg-indigo-500/10 group-hover:text-indigo-400 transition-colors">
+          <div className="p-2.5 bg-slate-800 rounded-xl group-hover:bg-slate-700 group-hover:text-slate-200 transition-colors">
             <Globe size={20} />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-white group-hover:text-indigo-300 transition-colors">{siteName}</h3>
+            <h3 className="text-sm font-bold text-white group-hover:text-slate-100 transition-colors">{siteName}</h3>
             <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">{vps}</p>
           </div>
         </div>
@@ -168,7 +168,7 @@ export default function SiteCard({ target, vps, onClick }: SiteCardProps) {
              <Zap size={10} className="text-amber-500/70" /> Request Rate
           </div>
           <div className="text-base font-black text-slate-200">
-            {metrics?.rpm || '1.2k'} <span className="text-[10px] text-slate-500 font-medium lowercase">rpm</span>
+            {metrics?.rpm ?? '0'} <span className="text-[10px] text-slate-500 font-medium lowercase">rpm</span>
           </div>
         </div>
 
@@ -177,16 +177,16 @@ export default function SiteCard({ target, vps, onClick }: SiteCardProps) {
              <Activity size={10} className="text-rose-500/70" /> Error Rate
           </div>
           <div className="text-base font-black text-rose-500">
-            {metrics?.error_rate || '0.01'} <span className="text-[10px] text-slate-500 font-medium">%</span>
+            {metrics?.error_rate ?? '0'} <span className="text-[10px] text-slate-500 font-medium">%</span>
           </div>
         </div>
 
         <div className="space-y-1">
           <div className="flex items-center gap-1.5 text-[9px] text-slate-500 uppercase font-black">
-             <Zap size={10} className="text-indigo-500/70" /> p95 Latency
+             <Zap size={10} className="text-slate-500/70" /> p95 Latency
           </div>
           <div className="text-base font-black text-slate-200">
-            {metrics?.p95 || '42'} <span className="text-[10px] text-slate-500 font-medium lowercase">ms</span>
+            {metrics?.p95 ?? '0'} <span className="text-[10px] text-slate-500 font-medium lowercase">ms</span>
           </div>
         </div>
 
@@ -195,16 +195,16 @@ export default function SiteCard({ target, vps, onClick }: SiteCardProps) {
              <Cpu size={10} className="text-emerald-500/70" /> Res Time
           </div>
           <div className="text-base font-black text-slate-200">
-            {metrics?.latency || '18'}<span className="text-[10px] text-slate-500 font-medium lowercase">ms</span>
+            {metrics?.latency ?? '0'}<span className="text-[10px] text-slate-500 font-medium lowercase">ms</span>
           </div>
         </div>
       </div>
 
-      <div className="mt-5 pt-4 border-t border-slate-700/50 flex justify-between items-center group-hover:border-indigo-500/20 transition-colors">
-        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5 group-hover:text-indigo-400 transition-colors">
+      <div className="mt-5 pt-4 border-t border-slate-800/50 flex justify-between items-center group-hover:border-slate-500/20 transition-colors">
+        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-1.5 group-hover:text-slate-400 transition-colors">
           <Database size={10} /> Live Logs Available
         </span>
-        <div className="text-indigo-500 group-hover:translate-x-1 transition-transform">
+        <div className="text-slate-500 group-hover:translate-x-1 transition-transform">
            <Zap size={14} fill="currentColor" />
         </div>
       </div>

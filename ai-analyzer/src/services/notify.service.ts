@@ -1,4 +1,3 @@
-import axios from 'axios';
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
 dotenv.config();
@@ -7,13 +6,17 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;
 
-// Email config
+const SMTP_HOST = process.env.SMTP_HOST;
+const SMTP_PORT = parseInt(process.env.SMTP_PORT || '465');
 const SMTP_USER = process.env.SMTP_USER;
 const SMTP_PASS = process.env.SMTP_PASS;
-const NOTIFY_EMAIL = process.env.NOTIFY_EMAIL;
+const SMTP_SECURE = process.env.SMTP_SECURE === 'ssl';
+const CONTACT_INBOX = process.env.CONTACT_INBOX;
 
 const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: SMTP_HOST,
+  port: SMTP_PORT,
+  secure: SMTP_SECURE, // true for 465, false for other ports
   auth: {
     user: SMTP_USER,
     pass: SMTP_PASS,
@@ -37,44 +40,18 @@ ${incident.root_cause}
 ${incident.suggested_fix}
 `;
 
-  // 1. Send to Telegram
-  if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
-    try {
-      await axios.post(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-        chat_id: TELEGRAM_CHAT_ID,
-        text: textMessage,
-        parse_mode: 'Markdown'
-      });
-      console.log('Notification sent to Telegram');
-    } catch (err: any) {
-      console.error('Failed to send Telegram message:', err.message);
-    }
-  }
-
-  // 2. Send to Discord
-  if (DISCORD_WEBHOOK_URL) {
-    try {
-      await axios.post(DISCORD_WEBHOOK_URL, {
-        content: textMessage.replace(/\*\*/g, '**') // Discord uses markdown natively
-      });
-      console.log('Notification sent to Discord');
-    } catch (err: any) {
-      console.error('Failed to send Discord message:', err.message);
-    }
-  }
-
-  // 3. Send Email via Gmail
-  if (SMTP_USER && SMTP_PASS && NOTIFY_EMAIL) {
+  // 1. Send Email via Hostinger (Primary Channel)
+  if (SMTP_USER && SMTP_PASS && CONTACT_INBOX) {
     try {
       const mailOptions = {
-        from: `"Monitoring SOC" <${SMTP_USER}>`,
-        to: NOTIFY_EMAIL,
-        subject: `${emoji} [${incident.severity.toUpperCase()}] Alert: ${incident.alert_name}`,
+        from: `"Nexus Monitoring" <${SMTP_USER}>`,
+        to: CONTACT_INBOX,
+        subject: `${emoji} [${incident.severity.toUpperCase()}] SOC Alert: ${incident.alert_name}`,
         text: textMessage,
       };
 
       await transporter.sendMail(mailOptions);
-      console.log(`Notification email sent to ${NOTIFY_EMAIL}`);
+      console.log(`Notification email sent to ${CONTACT_INBOX}`);
     } catch (err: any) {
       console.error('Failed to send Email notification:', err.message);
     }

@@ -29,8 +29,6 @@ export const executeDatabaseBackup = async (target: string): Promise<any> => {
     const dbName = process.env.DB_NAME || 'nexus_db';
 
     // Construct the pg_dump command
-    // Using PGPASSWORD env variable inline on windows requires cross-env usually, 
-    // but we can pass it securely via the 'env' option in exec
     const command = `pg_dump -h ${host} -p ${port} -U ${user} -F c -f "${outputPath}" ${dbName}`;
 
     console.log(`Starting backup for target ${target}: ${filename}`);
@@ -53,7 +51,6 @@ export const executeDatabaseBackup = async (target: string): Promise<any> => {
     }
 
     if (stderr && !stderr.includes('pg_dump: warning:')) {
-      // pg_dump outputs warnings to stderr sometimes, but real errors too
       console.warn('pg_dump stderr:', stderr);
     }
 
@@ -80,5 +77,33 @@ export const executeDatabaseBackup = async (target: string): Promise<any> => {
       success: false,
       error: error.message || 'Unknown backup failure'
     };
+  }
+};
+
+export const triggerDatabaseBackup = executeDatabaseBackup;
+
+export const getBackupHistory = async (): Promise<any[]> => {
+  try {
+    const backupDir = path.join(process.cwd(), 'backups');
+    if (!fs.existsSync(backupDir)) return [];
+
+    const files = fs.readdirSync(backupDir);
+    const history = files
+      .filter(f => f.endsWith('.dump'))
+      .map(f => {
+        const stats = fs.statSync(path.join(backupDir, f));
+        return {
+          filename: f,
+          size: (stats.size / (1024 * 1024)).toFixed(2) + ' MB',
+          timestamp: stats.mtime.toISOString(),
+          target: f.split('_')[2] || 'unknown'
+        };
+      })
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    return history;
+  } catch (err) {
+    console.error('Failed to retrieve backup history:', err);
+    return [];
   }
 };

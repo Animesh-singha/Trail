@@ -21,10 +21,8 @@ export default function ServerGrid() {
           }
         }
       } catch (err) {
-        setServers([
-            { hostname: 'vps-lon-01', ip: '45.12.88.101', ram_used: 1.4, ram_total: 4, cpu_load: 12, disk_used: 45, disk_total: 100, load_avg: [0.12, 0.45, 0.88], net_in: '12MB/s', net_out: '4MB/s', status: 'online' },
-            { hostname: 'vps-nyc-02', ip: '104.21.5.22', ram_used: 6.8, ram_total: 8, cpu_load: 45, disk_used: 110, disk_total: 200, load_avg: [1.2, 1.45, 1.33], net_in: '85MB/s', net_out: '22MB/s', status: 'online' }
-        ]);
+        console.error('Failed to fetch server metrics:', err);
+        setServers([]);
       } finally {
         setLoading(false);
       }
@@ -127,23 +125,23 @@ export default function ServerGrid() {
               {/* RAM & CPU Bar Group */}
               <div className="grid grid-cols-2 gap-4">
                  <div>
-                    <div className="flex justify-between items-center mb-1 text-[9px] uppercase font-black tracking-tighter text-slate-500">
-                       <span>RAM</span>
-                       <span className="text-slate-300">{server.ram_used}G</span>
-                    </div>
-                    <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
-                      <motion.div initial={{width: 0}} animate={{width:`${ramPercent}%`}} className={`h-full ${ramPercent > 85 ? 'bg-rose-500' : 'bg-indigo-500'}`} />
-                    </div>
-                 </div>
-                 <div>
-                    <div className="flex justify-between items-center mb-1 text-[9px] uppercase font-black tracking-tighter text-slate-500">
-                       <span>CPU</span>
-                       <span className="text-slate-300">{server.cpu_load}%</span>
-                    </div>
-                    <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
-                      <motion.div initial={{width: 0}} animate={{width:`${server.cpu_load}%`}} className={`h-full ${server.cpu_load > 60 ? 'bg-amber-500' : 'bg-emerald-500'}`} />
-                    </div>
-                 </div>
+                     <div className="flex justify-between items-center mb-1 text-[9px] uppercase font-black tracking-tighter text-slate-500">
+                        <span>RAM</span>
+                        <span className="text-slate-300">{server.ram_used}G</span>
+                     </div>
+                     <div className="h-1 bg-slate-900 rounded-full overflow-hidden">
+                       <motion.div initial={{width: 0}} animate={{width:`${ramPercent}%`}} className={`h-full ${ramPercent > 85 ? 'bg-rose-500' : 'bg-slate-500'}`} />
+                     </div>
+                  </div>
+                  <div>
+                     <div className="flex justify-between items-center mb-1 text-[9px] uppercase font-black tracking-tighter text-slate-500">
+                        <span>CPU</span>
+                        <span className="text-slate-300">{server.cpu_load}%</span>
+                     </div>
+                     <div className="h-1 bg-slate-900 rounded-full overflow-hidden">
+                       <motion.div initial={{width: 0}} animate={{width:`${server.cpu_load}%`}} className={`h-full ${server.cpu_load > 60 ? 'bg-rose-500' : 'bg-emerald-500'}`} />
+                     </div>
+                  </div>
               </div>
 
               {/* Disk Usage (Operational Deepening) */}

@@ -3,41 +3,89 @@ import { NextRequest, NextResponse } from 'next/server';
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const target = url.searchParams.get('target');
-  const PROMETHEUS_URL = process.env.PROMETHEUS_URL || 'http://127.0.0.1:9090';
+  const PROMETHEUS_URL = process.env.PROMETHEUS_URL || 'http://prometheus:9090';
 
   try {
-    // In production, we'd query:
-    // 1. sum(rate(http_requests_total{instance="${target}"}[5m])) -> RPM
-    // 2. histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{instance="${target}"}[5m])) by (le)) -> Latency
-    // 3. (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 -> RAM %
-
-    const response = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=probe_http_duration_seconds`);
+    // 1. Fetch Real Server Metrics from Node Exporter
+    const cpuRes = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)`);
+    const memRes = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100`);
+    const diskRes = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=(1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) * 100`);
     
-    if (!response.ok) throw new Error('Prometheus unreachable');
+    const cpuData = await cpuRes.json();
+    const memData = await memRes.json();
+    const diskData = await diskRes.json();
 
-    const data = await response.json();
-    return NextResponse.json(data);
-  } catch (error) {
-    // SANDBOX MOCK DATA
-    const mockWebsites = [
-      { target: 'https://demo-bank.io', rpm: 142, latency: 48, memory: 865, cpu: 7, trend: 'up', vps: 'vps-lon-01' },
-      { target: 'https://security-vault.net', rpm: 84, latency: 31, memory: 432, cpu: 11, trend: 'stable', vps: 'vps-lon-01' },
-      { target: 'https://nexus-core-api.dev', rpm: 8, latency: 462, memory: 1950, cpu: 64, trend: 'down', vps: 'vps-nyc-02' },
-      { target: 'https://global-cdn.com', rpm: 1105, latency: 14, memory: 115, cpu: 3, trend: 'up', vps: 'vps-sg-03' }
-    ];
+    const servers = (cpuData.data?.result || []).map((res: any, idx: number) => {
+      const memVal = memData.data?.result[idx]?.value[1] || '0';
+      const diskVal = diskData.data?.result[idx]?.value[1] || '0';
+      return {
+        hostname: res.metric.instance || 'Host',
+        ip: res.metric.instance.split(':')[0],
+        ram_used: Math.round(parseFloat(memVal)),
+        ram_total: 100,
+        cpu_load: Math.round(parseFloat(res.value[1])),
+        disk_used: Math.round(parseFloat(diskVal)),
+        disk_total: 100,
+        status: 'online'
+      };
+    });
 
-    const mockServers = [
-      { hostname: 'vps-lon-01', ip: '45.12.88.101', ram_used: 1.4, ram_total: 4, cpu_load: 12, status: 'online' },
-      { hostname: 'vps-nyc-02', ip: '104.21.5.22', ram_used: 6.8, ram_total: 8, cpu_load: 45, status: 'online' },
-      { hostname: 'vps-sg-03', ip: '209.15.200.4', ram_used: 1.1, ram_total: 2, cpu_load: 85, status: 'online' },
-      { hostname: 'vps-backup-04', ip: '192.168.1.15', ram_used: 0.8, ram_total: 4, cpu_load: 2, status: 'online' }
-    ];
+    // 2. Fetch Real Website Metrics from Blackbox Exporter
+    const latencyRes = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=probe_duration_seconds * 1000`);
+    const latencyData = await latencyRes.json();
+
+    const websites = (latencyData.data?.result || []).map((res: any) => ({
+      target: res.metric.instance || 'Unknown',
+      rpm: 0, 
+      latency: Math.round(parseFloat(res.value[1])),
+      memory: 0, 
+      cpu: 0,    
+      trend: 'stable',
+      vps: 'Local-Fleet'
+    }));
+
+    // 3. Fetch Real Container Metrics (cAdvisor)
+    const containerRes = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=container_memory_usage_bytes{name!=""}`);
+    const containerData = await containerRes.json();
+    const containers = (containerData.data?.result || []).map((res: any) => ({
+      name: res.metric.name,
+      memory: (parseFloat(res.value[1]) / 1024 / 1024).toFixed(1) + 'MB',
+      status: 'running'
+    }));
+
+    // 4. Fetch Real Database Metrics (Postgres Exporter)
+    const dbRes = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=pg_up`);
+    const dbData = await dbRes.json();
+    const dbStatus = dbData.data?.result?.[0]?.value?.[1] === '1' ? 'Healthy' : 'Down';
+
+    // 5. Fetch Real PM2 Application Metrics (PM2 Exporter)
+    const pm2Res = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=pm2_process_cpu`);
+    const pm2MemRes = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=pm2_process_memory`);
+    const pm2Data = await pm2Res.json();
+    const pm2MemData = await pm2MemRes.json();
+    
+    const apps = (pm2Data.data?.result || []).map((res: any, idx: number) => ({
+      name: res.metric.name || 'Unknown App',
+      cpu: parseFloat(res.value[1]).toFixed(1) + '%',
+      memory: (parseFloat(pm2MemData.data?.result[idx]?.value[1] || 0) / 1024 / 1024).toFixed(1) + 'MB',
+      status: 'active'
+    }));
 
     if (target) {
-        const single = mockWebsites.find(m => m.target.includes(target.replace(/https?:\/\//, ''))) || mockWebsites[0];
+        const single = websites.find((w: any) => w.target.includes(target.replace(/https?:\/\//, ''))) || websites[0];
         return NextResponse.json(single);
     }
 
-    return NextResponse.json({ websites: mockWebsites, servers: mockServers });
+    if (servers.length === 0 && websites.length === 0) throw new Error('No real metrics found in Prometheus');
+
+    return NextResponse.json({ websites, servers, containers, dbStatus, apps });
+
+  } catch (error: any) {
+    console.error('Metrics Retrieval Failed:', error.message);
+    return NextResponse.json({ 
+      error: 'Data Retrieval Failed', 
+      message: 'Connection to monitoring database failed. Showing no data to avoid false information.',
+      timestamp: new Date().toISOString()
+    }, { status: 503 });
   }
 }

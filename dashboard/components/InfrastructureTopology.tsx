@@ -85,14 +85,14 @@ export default function InfrastructureTopology({ incidents = [] }: { incidents?:
 
   if (loading) return (
     <div className="h-[400px] flex items-center justify-center opacity-30">
-        <Activity className="animate-spin text-indigo-500 w-12 h-12" />
+        <Activity className="animate-spin text-slate-500 w-12 h-12" />
     </div>
   );
 
   return (
     <div className="glass-panel p-8 rounded-3xl min-h-[500px] overflow-x-auto relative bg-[#060910]/40 border border-slate-800/50 shadow-2xl">
       <div className="flex justify-between items-center mb-12">
-         <h3 className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] flex items-center gap-2">
+         <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
             <Network size={14} /> Full-Stack Dependency Graph
          </h3>
          <div className="flex gap-6 text-[9px] uppercase font-black text-slate-500 tracking-widest">
@@ -162,17 +162,18 @@ export default function InfrastructureTopology({ incidents = [] }: { incidents?:
               <div className={`p-4 rounded-2xl ${getColor(node.status)} shadow-lg shadow-black/20 group-hover:scale-110 transition-transform cursor-pointer relative`}>
                  <Icon className="text-white" size={24} />
                  <div className={`absolute -inset-2 bg-inherit opacity-20 blur-xl transition-opacity rounded-full ${isWarning ? 'animate-pulse opacity-40' : 'group-hover:opacity-40'}`}></div>
+                 <div className={`absolute -inset-2 bg-slate-500 opacity-0 blur-lg transition-opacity rounded-full ${isWarning ? 'animate-pulse opacity-20' : 'group-hover:opacity-20'}`}></div>
               </div>
               <div className="text-center">
                  <div className="text-[10px] font-black uppercase tracking-tight text-white mb-0.5">{node.label}</div>
                  <div className="text-[9px] text-slate-500 font-mono tracking-tighter italic">
                     {node.type} • {node.status === 'online' ? 'ok' : node.status}
                  </div>
-                 {node.metadata?.port && (
-                    <div className="text-[8px] text-indigo-400 font-bold mt-1 bg-indigo-500/5 border border-indigo-500/20 px-1.5 py-0.5 rounded uppercase">
+                  {node.metadata?.port && (
+                    <div className="text-[8px] text-slate-400 font-bold mt-1 bg-white/5 border border-slate-700/30 px-1.5 py-0.5 rounded uppercase">
                        Port {node.metadata.port}
                     </div>
-                 )}
+                  )}
               </div>
             </motion.div>
           );
@@ -181,10 +182,10 @@ export default function InfrastructureTopology({ incidents = [] }: { incidents?:
 
       <div className="mt-8 pt-6 border-t border-slate-800/50 flex items-center justify-between text-[10px] text-slate-500 uppercase font-black">
          <div className="flex gap-4">
-            <span className="flex items-center gap-2"><div className="w-1 h-1 bg-indigo-500 rounded-full"></div> Discovery: v2.4.0-Live</span>
-            <span className="flex items-center gap-2"><div className="w-1 h-1 bg-indigo-500 rounded-full"></div> Refresh Rate: 60s</span>
+            <span className="flex items-center gap-2"><div className="w-1 h-1 bg-slate-500 rounded-full"></div> Discovery: v2.4.0-Live</span>
+            <span className="flex items-center gap-2"><div className="w-1 h-1 bg-slate-500 rounded-full"></div> Refresh Rate: 60s</span>
          </div>
-         <div className="text-indigo-400 bg-indigo-500/10 px-3 py-1.5 rounded-lg border border-indigo-500/20 hover:bg-indigo-500/20 cursor-help transition-all">
+         <div className="text-slate-400 bg-white/5 px-3 py-1.5 rounded-lg border border-slate-800 hover:bg-slate-800 cursor-help transition-all">
             AI Impact Simulator Off-line
          </div>
       </div>

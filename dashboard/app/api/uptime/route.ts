@@ -25,16 +25,11 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json(uptimeData);
   } catch (error: any) {
-    console.warn('Prometheus unavailable, serving Sandbox/Demo data.');
-    
-    // SANDBOX FALLBACK DATA
-    const sandboxData = [
-      { target: 'https://demo-bank.io', status: 'UP' },
-      { target: 'https://security-vault.net', status: 'UP' },
-      { target: 'https://nexus-core-api.dev', status: 'DOWN' },
-      { target: 'https://global-cdn.com', status: 'UP' }
-    ];
-
-    return NextResponse.json(sandboxData);
+    console.error('Prometheus Connection Error:', error.message);
+    return NextResponse.json({ 
+      error: 'Prometheus connection failed', 
+      message: 'No real-time data available. Check your Prometheus service.',
+      timestamp: new Date().toISOString()
+    }, { status: 503 });
   }
 }

@@ -1,5 +1,3 @@
-const axios = require('axios');
-
 async function triggerFakeAlert() {
   const alertPayload = {
     "receiver": "ai-analyzer",
@@ -26,12 +24,23 @@ async function triggerFakeAlert() {
   };
 
   try {
-    console.log("🔥 Firing dummy alert to the AI Analyzer Webhook (http://localhost:3001)...");
-    const response = await axios.post('http://localhost:3001/v1/webhook', alertPayload);
-    console.log("✅ Alert sent successfully! Webhook response:", response.status);
-    console.log("⏳ Wait about 5-10 seconds for the AI to process it and see it appear in the dashboard!");
+    console.log("🔥 Firing dummy alert to the AI Analyzer Webhook (http://localhost:3101)...");
+    
+    const response = await fetch('http://localhost:3101/v1/webhook', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(alertPayload)
+    });
+
+    if (response.ok) {
+      console.log("✅ Alert sent successfully! Status:", response.status);
+      console.log("⏳ Wait about 5-10 seconds for the AI to process it and see it appear in the dashboard!");
+    } else {
+      console.error("❌ Failed to send alert. Status:", response.status);
+    }
   } catch (err) {
-    console.error("❌ Failed to send alert. Is the ai-analyzer service running on port 3001?");
+    console.error("❌ Network error. Is the ai-analyzer service running on port 3101?");
+    console.error(err);
   }
 }
 

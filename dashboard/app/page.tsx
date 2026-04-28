@@ -6,13 +6,14 @@ import {
   AlertTriangle, Activity, ShieldAlert, CheckCircle, ServerCrash, Server, X, Maximize2,
   Layout, Server as ServerIcon, Globe, AlertCircle,
   Terminal as TerminalIcon, Share2, ShieldCheck, Shield, Eye, EyeOff,
-  Brain, Info, Zap, ArrowRight, Boxes, Network, Share as ShareIcon
+  Brain, Info, Zap, ArrowRight, Boxes, Network, Share as ShareIcon, Search
 } from 'lucide-react';
 
 import ChatWidget from '@/components/ChatWidget';
 import LiveLogsViewer from '@/components/LiveLogsViewer';
 import UptimeMonitor from '@/components/UptimeMonitor';
 import ServerGrid from '@/components/ServerGrid';
+import FileIntegrityList from '@/components/FileIntegrityList';
 import SiteCard from '@/components/SiteCard';
 import FleetOverview from '@/components/FleetOverview';
 import ErrorStream from '@/components/ErrorStream';
@@ -34,7 +35,12 @@ export default function DashboardPage() {
   const [stats, setStats] = useState({ total: 0, critical: 0, last24h: 0 });
   const [loading, setLoading] = useState(true);
   const [monitoredSites, setMonitoredSites] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'offline'>('all');
   const [servers, setServers] = useState<any[]>([]);
+  const [containers, setContainers] = useState<any[]>([]);
+  const [apps, setApps] = useState<any[]>([]);
+  const [dbStatus, setDbStatus] = useState('Unknown');
   const [analytics, setAnalytics] = useState<any>({ mttr: '0.0', frequency: [] });
   const [selectedSite, setSelectedSite] = useState<any | null>(null);
   const [selectedIncident, setSelectedIncident] = useState<any | null>(null);
@@ -269,6 +275,9 @@ export default function DashboardPage() {
             const data = await res.json();
             if (data.websites && sitesData.length === 0) sitesData = data.websites;
             if (data.servers && serversData.length === 0) serversData = data.servers;
+            if (data.containers) setContainers(data.containers);
+            if (data.apps) setApps(data.apps);
+            if (data.dbStatus) setDbStatus(data.dbStatus);
           }
         }
 
@@ -382,13 +391,19 @@ export default function DashboardPage() {
 
   const healthScore = Math.max(0, 100 - (Number(stats.critical) * 10) - (incidents.filter((i: any) => i.status === 'OPEN').length * 2));
 
-  // Group sites by VPS
-  const sitesByVps = monitoredSites.reduce((acc: Record<string, any[]>, site: any) => {
-    const vps = site.vps || 'unknown';
-    if (!acc[vps]) acc[vps] = [];
-    acc[vps].push(site);
-    return acc;
-  }, {});
+  // Group and Filter sites by VPS
+  const sitesByVps = monitoredSites
+    .filter(site => {
+      const matchesSearch = site.target.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesFilter = filterStatus === 'all' || site.status === 'offline';
+      return matchesSearch && matchesFilter;
+    })
+    .reduce((acc: Record<string, any[]>, site: any) => {
+      const vps = site.vps || 'unknown';
+      if (!acc[vps]) acc[vps] = [];
+      acc[vps].push(site);
+      return acc;
+    }, {});
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: Layout },
@@ -406,10 +421,10 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center font-mono">
+      <div className="min-h-screen bg-black flex items-center justify-center font-mono">
         <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div>
-          <div className="text-indigo-400 text-[10px] font-black uppercase tracking-[0.3em] animate-pulse">Synchronizing Fleet...</div>
+          <div className="w-12 h-12 border-2 border-slate-500/20 border-t-slate-500 rounded-full animate-spin"></div>
+          <div className="text-slate-400 text-[10px] font-black uppercase tracking-[0.3em] animate-pulse">Synchronizing Fleet...</div>
         </div>
       </div>
     );
@@ -422,7 +437,7 @@ export default function DashboardPage() {
         <div className="max-w-[1600px] mx-auto flex justify-between items-center sm:gap-6 gap-3">
           <div className="flex flex-wrap items-center gap-3 sm:gap-6">
             <div className="group flex flex-col cursor-help">
-              <span className="text-[9px] sm:text-[10px] text-slate-500 font-black uppercase tracking-widest group-hover:text-indigo-400 transition-colors">Fleet Nodes</span>
+              <span className="text-[9px] sm:text-[10px] text-slate-500 font-black uppercase tracking-widest group-hover:text-slate-300 transition-colors">Fleet Nodes</span>
               <div className="flex items-center gap-2">
                 <span className="text-base sm:text-lg font-black text-white">{servers.filter(s => s.status === 'online').length}</span>
                 <span className="text-[9px] sm:text-[10px] text-emerald-400 font-bold">READY</span>
@@ -430,10 +445,10 @@ export default function DashboardPage() {
             </div>
             <div className="w-px h-6 bg-slate-800 hidden sm:block"></div>
             <div className="group flex flex-col cursor-help">
-              <span className="text-[9px] sm:text-[10px] text-slate-500 font-black uppercase tracking-widest group-hover:text-indigo-400 transition-colors">Active Assets</span>
+              <span className="text-[9px] sm:text-[10px] text-slate-500 font-black uppercase tracking-widest group-hover:text-slate-300 transition-colors">Active Assets</span>
               <div className="flex items-center gap-2">
                 <span className="text-base sm:text-lg font-black text-white">{monitoredSites.length}</span>
-                <span className="text-[9px] sm:text-[10px] text-indigo-400 font-bold">LIVE</span>
+                <span className="text-[9px] sm:text-[10px] text-slate-400 font-bold">LIVE</span>
               </div>
             </div>
             <div className="w-px h-6 bg-slate-800 hidden sm:block"></div>
@@ -478,14 +493,14 @@ export default function DashboardPage() {
             </div>
 
             <button className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 border border-slate-800 rounded-lg text-[9px] font-black text-slate-400 hover:text-white transition-all group">
-              <kbd className="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-500 group-hover:text-white group-hover:border-indigo-500 transition-colors">Ctrl + K</kbd>
+              <kbd className="px-1.5 py-0.5 bg-slate-800 rounded border border-slate-700 text-slate-500 group-hover:text-white group-hover:border-slate-500 transition-colors">Ctrl + K</kbd>
               COMMAND CENTER
             </button>
 
             <select
               value={timeRange}
               onChange={(e) => setTimeRange(e.target.value)}
-              className="bg-slate-900 border border-slate-800 rounded-lg px-3 py-1 text-[10px] font-bold text-indigo-400 focus:ring-1 focus:ring-indigo-500 outline-none"
+              className="bg-slate-900 border border-slate-800 rounded-lg px-3 py-1 text-[10px] font-bold text-slate-400 focus:ring-1 focus:ring-slate-500 outline-none"
             >
               <option value="1h">Last 1 Hour</option>
               <option value="5m">Last 5 Minutes</option>
@@ -518,13 +533,6 @@ export default function DashboardPage() {
                   <p className="text-slate-400 text-sm md:text-base ml-0.5 mt-0.5">Autonomous monitoring platform with AI incident resolution.</p>
                 </div>
               </div>
-              <button 
-                onClick={() => setIsSandboxOpen(true)}
-                className="px-3 py-1 bg-indigo-500/10 hover:bg-indigo-500/20 active:scale-95 transition-all border border-indigo-500/30 text-[9px] font-black uppercase tracking-widest rounded-full text-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.2)] shrink-0 cursor-pointer flex items-center gap-2 relative z-50"
-              >
-                <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-pulse"></span>
-                Sandbox Mode Active
-              </button>
             </div>
 
             {/* Middle Row: Uptime Monitor Pills */}
@@ -533,12 +541,12 @@ export default function DashboardPage() {
             </div>
 
             {/* Bottom Row: Navigation Tabs */}
-            <div className="bg-slate-900/50 p-1.5 rounded-2xl border border-slate-800 flex flex-wrap gap-1 shadow-inner w-full">
+            <div className="bg-slate-950/50 p-1.5 rounded-2xl border border-slate-800 flex flex-wrap gap-1 shadow-inner w-full">
               {tabs.map(tab => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-[10px] sm:text-xs font-bold transition-all flex-1 md:flex-initial ${activeTab === tab.id ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800'}`}
+                  className={`flex items-center justify-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-[10px] sm:text-xs font-bold transition-all flex-1 md:flex-initial ${activeTab === tab.id ? 'bg-slate-800 text-white shadow-lg shadow-black/40' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-900'}`}
                 >
                   <tab.icon className="w-4 h-4" />
                   <span className="hidden sm:inline">{tab.label}</span>
@@ -562,7 +570,13 @@ export default function DashboardPage() {
                   <h2 className="text-2xl font-bold mb-6 flex items-center gap-3 text-indigo-100 uppercase tracking-tight">
                     <Layout className="text-indigo-500" /> Fleet Intelligence Overview
                   </h2>
-                  <FleetOverview websites={monitoredSites} servers={servers} securityScore={healthScore} />
+                  <FleetOverview 
+                    websites={monitoredSites} 
+                    servers={servers} 
+                    containers={containers}
+                    dbStatus={dbStatus}
+                    securityScore={healthScore} 
+                  />
 
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
                     <div className="space-y-6">
@@ -596,13 +610,13 @@ export default function DashboardPage() {
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <MetricGraph
                       label="Fleet Avg CPU"
-                      data={[12, 15, 22, 18, 25, 30, 28, 35, 42, 38, 32, 28, 24, 20]}
+                      data={servers.map(s => s.cpu_load)}
                       color="indigo"
                       unit="%"
                     />
                     <MetricGraph
                       label="Network Ingress"
-                      data={[102, 115, 122, 118, 225, 330, 228, 235, 442, 338, 332, 228, 224, 220]}
+                      data={[]}
                       color="emerald"
                       unit="mb/s"
                     />
@@ -616,7 +630,7 @@ export default function DashboardPage() {
                         ].map(reg => (
                           <div key={reg.region} className="flex justify-between items-center bg-slate-900/40 p-3 rounded-lg border border-slate-800/30">
                             <span className="text-[10px] font-bold text-slate-300">{reg.region}</span>
-                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${reg.count > 0 ? 'bg-indigo-500/20 text-indigo-400' : 'bg-slate-800 text-slate-500'}`}>
+                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${reg.count > 0 ? 'bg-slate-500/20 text-slate-400' : 'bg-slate-800 text-slate-500'}`}>
                               {reg.count} NODES
                             </span>
                           </div>
@@ -631,9 +645,16 @@ export default function DashboardPage() {
               {activeTab === 'infrastructure' && (
                 <section>
                   <h2 className="text-2xl font-bold mb-6 flex items-center gap-3 text-indigo-100 uppercase tracking-tight">
-                    <ServerIcon className="text-indigo-500" /> Infrastructure Nodes
+                    <ServerIcon className="text-indigo-500" /> Fleet Audit & Control
                   </h2>
-                  <ServerGrid />
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div className="lg:col-span-2">
+                      <ServerGrid />
+                    </div>
+                    <div>
+                      <FileIntegrityList />
+                    </div>
+                  </div>
                 </section>
               )}
 
@@ -692,30 +713,33 @@ export default function DashboardPage() {
                             </tr>
                           </thead>
                           <tbody className="text-xs">
-                            {[
-                              { name: 'nginx', pid: 822, user: 'root', ports: '80, 443', resources: '0.2% / 12MB', uptime: '14d 2h', status: 'online' },
-                              { name: 'node (yoforex)', pid: 1422, user: 'node', ports: '3000 (proxy)', resources: '1.4% / 142MB', uptime: '4d 1h', status: 'online' },
-                              { name: 'node (nexus-api)', pid: 5562, user: 'node', ports: '3001 (proxy)', resources: '2.1% / 210MB', uptime: '8d 4h', status: 'warning' },
-                              { name: 'postgres', pid: 911, user: 'postgres', ports: '5432', resources: '0.4% / 512MB', uptime: '14d 2h', status: 'online' },
-                              { name: 'redis-server', pid: 102, user: 'redis', ports: '6379', resources: '0.1% / 24MB', uptime: '14d 2h', status: 'online' }
-                            ].map((app, i) => (
-                              <tr key={i} className="bg-slate-900/40 hover:bg-slate-900/60 transition-colors border-y border-slate-800/30">
-                                <td className="px-4 py-3 font-bold text-indigo-100 flex items-center gap-3">
-                                  <div className={`w-1.5 h-1.5 rounded-full ${app.status === 'online' ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`}></div>
-                                  {app.name}
-                                </td>
-                                <td className="px-4 py-3 font-mono text-slate-400">{app.pid}</td>
-                                <td className="px-4 py-3 text-slate-500">{app.user}</td>
-                                <td className="px-4 py-3 font-mono text-indigo-400">{app.ports}</td>
-                                <td className="px-4 py-3 text-slate-400">{app.resources}</td>
-                                <td className="px-4 py-3 text-slate-500">{app.uptime}</td>
-                                <td className="px-4 py-3 text-right">
-                                  <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-md border ${app.status === 'online' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse'}`}>
-                                    {app.status}
-                                  </span>
+                            {/* App Discovery auto-detects PM2 and Docker processes */}
+                            {apps.length > 0 ? (
+                              apps.map((app: any, i: number) => (
+                                <tr key={i} className="bg-slate-900/40 hover:bg-slate-900/60 transition-colors border-y border-slate-800/30">
+                                  <td className="px-4 py-3 font-bold text-indigo-100 flex items-center gap-3">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+                                    {app.name}
+                                  </td>
+                                  <td className="px-4 py-3 font-mono text-slate-400">N/A</td>
+                                  <td className="px-4 py-3 text-slate-500">ubuntu</td>
+                                  <td className="px-4 py-3 font-mono text-indigo-400">---</td>
+                                  <td className="px-4 py-3 text-slate-400">{app.cpu} / {app.memory}</td>
+                                  <td className="px-4 py-3 text-slate-500">online</td>
+                                  <td className="px-4 py-3 text-right">
+                                    <span className="text-[9px] font-black uppercase px-2 py-1 rounded-md border bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
+                                      {app.status}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))
+                            ) : (
+                              <tr>
+                                <td colSpan={7} className="px-4 py-8 text-center text-slate-500 italic">
+                                  Waiting for PM2 Discovery Agent to scan VPS processes...
                                 </td>
                               </tr>
-                            ))}
+                            )}
                           </tbody>
                         </table>
                       </div>
@@ -727,11 +751,37 @@ export default function DashboardPage() {
               {/* 3. WEB ASSETS SECTION */}
               {activeTab === 'web-assets' && (
                 <section className="space-y-12">
-                  <div>
-                    <h2 className="text-2xl font-bold mb-2 flex items-center gap-3 text-indigo-100 uppercase tracking-tight">
-                      <Globe className="text-indigo-500" /> Live Site Health Monitor
-                    </h2>
-                    <p className="text-slate-500 text-sm mb-8">Click the <strong>⋮ menu</strong> on any card to Restart, Reload, or take a Database Backup independently.</p>
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+                      <div>
+                        <h2 className="text-2xl font-bold mb-2 flex items-center gap-3 text-indigo-100 uppercase tracking-tight">
+                          <Globe className="text-indigo-500" /> Live Site Health Monitor
+                        </h2>
+                        <p className="text-slate-500 text-sm">Managing {monitoredSites.length} assets across your global fleet.</p>
+                      </div>
+                      
+                      <div className="flex items-center gap-3 w-full md:w-auto">
+                        <div className="relative flex-1 md:w-64">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={14} />
+                          <input 
+                            type="text" 
+                            placeholder="Search assets..." 
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="w-full bg-slate-900 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs font-bold text-white focus:ring-1 focus:ring-indigo-500 outline-none"
+                          />
+                        </div>
+                        <button 
+                          onClick={() => setFilterStatus(filterStatus === 'all' ? 'offline' : 'all')}
+                          className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all ${
+                            filterStatus === 'offline' 
+                              ? 'bg-rose-500/20 border-rose-500 text-rose-400' 
+                              : 'bg-slate-900 border-slate-800 text-slate-500 hover:text-slate-300'
+                          }`}
+                        >
+                          {filterStatus === 'offline' ? 'Showing Offline Only' : 'Show All'}
+                        </button>
+                      </div>
+                    </div>
 
                     {Object.keys(sitesByVps).map((vpsName, vIdx) => (
                       <div key={vpsName} className="space-y-6 mb-10">
@@ -754,7 +804,6 @@ export default function DashboardPage() {
                         </div>
                       </div>
                     ))}
-                  </div>
                 </section>
               )}
 
@@ -832,9 +881,10 @@ export default function DashboardPage() {
               {activeTab === 'incidents' && (
                 <section>
                   <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-2xl font-bold flex items-center gap-3 text-indigo-100 uppercase tracking-tight">
-                      <AlertCircle className="text-indigo-500" /> Incident Command Center
-                    </h2>                 <div className="flex gap-4">
+                    <h2 className="text-2xl font-bold flex items-center gap-3 text-slate-100 uppercase tracking-tight">
+                      <AlertCircle className="text-slate-500" /> Incident Command Center
+                    </h2>
+                    <div className="flex gap-4">
                       <div className="text-[10px] text-slate-500 font-mono flex items-center gap-2">
                         <span className="w-2 h-2 rounded-full bg-rose-500"></span> {filteredIncidents.filter(i => i.status === 'OPEN').length} OPEN
                       </div>
@@ -861,7 +911,7 @@ export default function DashboardPage() {
                               className={`glass-panel p-6 rounded-2xl border-l-4 transition-all ${inc.status === 'RESOLVED' ? 'opacity-60 grayscale-[0.5] border-l-emerald-500' :
                                   inc.severity === 'CRITICAL' ? 'border-l-rose-600 shadow-[0_0_20px_rgba(225,29,72,0.1)]' :
                                     inc.severity === 'HIGH' ? 'border-l-rose-500' :
-                                      'border-l-indigo-500'
+                                      'border-l-slate-500'
                                 }`}
                             >
                               <div className="flex justify-between items-start mb-4">
@@ -869,12 +919,12 @@ export default function DashboardPage() {
                                   <div className="flex items-center gap-3 mb-1">
                                     <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border ${inc.severity === 'CRITICAL' ? 'bg-rose-500/20 text-rose-400 border-rose-500/30' :
                                         inc.severity === 'HIGH' ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' :
-                                          'bg-indigo-500/20 text-indigo-400 border-indigo-500/30'
+                                          'bg-slate-500/20 text-slate-400 border-slate-500/30'
                                       }`}>{inc.severity}</span>
                                     <span className="text-xs font-mono text-slate-500">{new Date(inc.timestamp).toLocaleString()}</span>
                                   </div>
                                   <h3 className="text-lg font-bold text-white">{inc.alert_name}</h3>
-                                  <p className="text-xs text-indigo-400 font-bold uppercase tracking-widest mt-1">{inc.service}</p>
+                                  <p className="text-xs text-slate-400 font-bold uppercase tracking-widest mt-1">{inc.service}</p>
                                 </div>
                                 <div className="text-right">
                                   <div className="text-[9px] text-slate-500 uppercase font-black mb-1">AI Confidence</div>
@@ -889,17 +939,17 @@ export default function DashboardPage() {
 
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 relative">
                                 {(!inc.root_cause || inc.root_cause === 'Gemini API Error' || inc.status === 'OPEN') && (
-                                  <div className="md:col-span-2 bg-slate-950/90 border border-indigo-500/30 rounded-xl p-4 font-mono text-[10px] overflow-hidden relative group">
-                                    <div className="flex items-center gap-2 mb-3 border-b border-indigo-500/20 pb-2">
+                                  <div className="md:col-span-2 bg-slate-950/90 border border-slate-500/30 rounded-xl p-4 font-mono text-[10px] overflow-hidden relative group">
+                                    <div className="flex items-center gap-2 mb-3 border-b border-slate-800 pb-2">
                                       <div className="flex gap-1">
                                         <div className="w-2 h-2 rounded-full bg-rose-500/50"></div>
                                         <div className="w-2 h-2 rounded-full bg-amber-500/50"></div>
                                         <div className="w-2 h-2 rounded-full bg-emerald-500/50"></div>
                                       </div>
-                                      <span className="text-indigo-400 font-bold uppercase tracking-widest">Nexus AI Agent Output</span>
+                                      <span className="text-slate-400 font-bold uppercase tracking-widest">Nexus AI Agent Output</span>
                                       <div className="ml-auto flex items-center gap-2">
-                                        <span className="w-2 h-2 bg-indigo-500 rounded-full animate-ping"></span>
-                                        <span className="text-indigo-500">LIVE_ANALYSIS</span>
+                                        <span className="w-2 h-2 bg-slate-500 rounded-full animate-ping"></span>
+                                        <span className="text-slate-500">LIVE_ANALYSIS</span>
                                       </div>
                                     </div>
                                     
@@ -911,10 +961,10 @@ export default function DashboardPage() {
                                       </motion.div>
                                       <motion.div initial={{opacity:0}} animate={{opacity:1}} transition={{delay:1.5}} className="flex gap-2">
                                          <span className="text-slate-600">[00:03]</span>
-                                         <span className="text-indigo-400">SCAN</span>
+                                         <span className="text-slate-400">SCAN</span>
                                          <span className="text-slate-400">Analyzing metrics baseline for {inc.service}...</span>
                                       </motion.div>
-                                      <motion.div initial={{opacity:0}} animate={{opacity:1}} transition={{delay:2.5}} className="flex gap-2 underline decoration-indigo-500/30">
+                                      <motion.div initial={{opacity:0}} animate={{opacity:1}} transition={{delay:2.5}} className="flex gap-2 underline decoration-slate-500/30">
                                          <span className="text-slate-600">[00:06]</span>
                                          <span className="text-amber-500">MATCH</span>
                                          <span className="text-slate-200">Signature found: {inc.alert_name} (Confidence: {inc.confidence}%)</span>
@@ -950,7 +1000,7 @@ export default function DashboardPage() {
                                 <div className="flex gap-3">
                                   <button
                                     onClick={() => setSelectedIncident(inc)}
-                                    className="px-4 py-2.5 bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 font-bold text-[10px] uppercase tracking-widest border border-indigo-500/30 rounded-xl transition-all"
+                                    className="px-4 py-2.5 bg-slate-500/10 hover:bg-slate-500/20 text-slate-400 font-bold text-[10px] uppercase tracking-widest border border-slate-500/30 rounded-xl transition-all"
                                   >
                                     Investigate Timeline
                                   </button>
@@ -975,8 +1025,8 @@ export default function DashboardPage() {
                     </div>
 
                     <div className="space-y-6">
-                      <div className="glass-panel p-6 rounded-2xl border border-indigo-500/20 shadow-[0_0_15px_rgba(99,102,241,0.05)]">
-                        <h3 className="text-sm font-bold text-indigo-300 mb-6 flex items-center gap-2">
+                      <div className="glass-panel p-6 rounded-2xl border border-slate-500/20 shadow-[0_0_15px_rgba(255,255,255,0.05)]">
+                        <h3 className="text-sm font-bold text-slate-300 mb-6 flex items-center gap-2">
                           <Activity size={16} /> Incident KPIs
                         </h3>
                         <div className="space-y-6">
@@ -986,7 +1036,7 @@ export default function DashboardPage() {
                               <span className="text-white">{analytics.mttr}m</span>
                             </div>
                             <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
-                              <div className="h-full bg-indigo-500" style={{ width: `${Math.min(100, Number(analytics.mttr) * 5)}%` }}></div>
+                              <div className="h-full bg-slate-500" style={{ width: `${Math.min(100, Number(analytics.mttr) * 5)}%` }}></div>
                             </div>
                           </div>
                           <div>
@@ -1025,13 +1075,13 @@ export default function DashboardPage() {
                           a.click();
                           document.body.removeChild(a);
                         }}
-                        className="w-full py-4 bg-indigo-500 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-lg shadow-indigo-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                        className="w-full py-4 bg-slate-800 text-white font-black text-xs uppercase tracking-widest rounded-2xl shadow-lg shadow-black/40 hover:scale-[1.02] active:scale-[0.98] transition-all border border-slate-700/50"
                       >
                         Export SLA Report (CSV)
                       </button>
 
                       <div className="bg-slate-900/40 p-4 rounded-xl border border-slate-800 text-[10px] text-slate-500 leading-relaxed font-mono">
-                        <div className="text-indigo-400 font-bold mb-1">PLATFORM INSIGHT</div>
+                        <div className="text-slate-400 font-bold mb-1">PLATFORM INSIGHT</div>
                         AI suggests that the last 3 critical incidents were related to VPS-NYC-02 resource exhaustion.
                       </div>
                     </div>
@@ -1063,7 +1113,7 @@ export default function DashboardPage() {
                   {/* Modal Header */}
                   <div className="px-6 py-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                      <div className="p-2 bg-indigo-500/10 rounded-lg text-indigo-400">
+                      <div className="p-2 bg-slate-500/10 rounded-lg text-slate-400">
                         <Maximize2 size={18} />
                       </div>
                       <div>
@@ -1091,7 +1141,7 @@ export default function DashboardPage() {
                   {/* Bottom Instructions */}
                   <div className="px-6 py-3 bg-slate-950/50 border-t border-slate-800 flex justify-between items-center">
                     <div className="flex items-center gap-2 text-[10px] text-slate-500 font-mono">
-                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-500 animate-pulse"></span>
                       READ-TIME LOG STREAM ACTIVE
                     </div>
                     <div className="text-[10px] text-slate-400 flex gap-4">
@@ -1144,7 +1194,7 @@ export default function DashboardPage() {
                     <div className="lg:col-span-2 space-y-8">
                       <div>
                         <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-6 flex items-center gap-2">
-                          <TerminalIcon size={14} className="text-indigo-500" /> Root Cause Storyboard
+                          <TerminalIcon size={14} className="text-slate-500" /> Root Cause Storyboard
                         </h3>
                         <RootCauseTimeline events={timelineEvents} isLoading={isTimelineLoading} />
                       </div>
@@ -1152,16 +1202,16 @@ export default function DashboardPage() {
 
                     {/* Actions & AI Section */}
                     <div className="space-y-6">
-                      <div className="glass-panel p-6 rounded-2xl border border-indigo-500/20 bg-indigo-500/5 relative overflow-hidden">
+                      <div className="glass-panel p-6 rounded-2xl border border-slate-500/20 bg-slate-500/5 relative overflow-hidden">
                         <div className="absolute top-0 right-0 p-2 opacity-10">
-                          <Activity size={40} className="text-indigo-400" />
+                          <Activity size={40} className="text-slate-400" />
                         </div>
-                        <h4 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
                           <Shield size={12} /> AI Incident Analyst
                         </h4>
 
                         <div className="bg-slate-950/80 rounded-xl p-3 font-mono text-[9px] text-slate-400 mb-6 border border-slate-800">
-                          <div className="flex items-center gap-2 mb-2 text-indigo-500/70 border-b border-slate-800 pb-1">
+                          <div className="flex items-center gap-2 mb-2 text-slate-500/70 border-b border-slate-800 pb-1">
                              <TerminalIcon size={10} /> Agent-Logs: v3.1.2-nexus
                           </div>
                           <div className="space-y-1">
@@ -1189,7 +1239,7 @@ export default function DashboardPage() {
                             </div>
 
                             <div className="text-[10px] text-slate-300 leading-relaxed bg-slate-950/50 p-3 rounded-lg border border-slate-800">
-                              <span className="text-indigo-400 font-bold block mb-1">PROBABLE ROOT CAUSE</span>
+                              <span className="text-slate-400 font-bold block mb-1">PROBABLE ROOT CAUSE</span>
                               {aiAnalysis.root_cause}
                             </div>
                             
@@ -1211,7 +1261,7 @@ export default function DashboardPage() {
                             <button
                               onClick={handleExplainAI}
                               disabled={isAnalyzing}
-                              className="w-full py-3 bg-indigo-500 hover:bg-indigo-400 disabled:opacity-50 text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-indigo-500/20 flex items-center justify-center gap-2"
+                              className="w-full py-3 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-all shadow-lg shadow-black/40 flex items-center justify-center gap-2 border border-slate-700/50"
                             >
                               {isAnalyzing ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div> : <Shield size={14} />}
                               {isAnalyzing ? 'Analyzing Failure...' : 'Explain with Gemini AI'}
@@ -1256,9 +1306,9 @@ export default function DashboardPage() {
           >
             <div className="text-slate-500 text-xs font-medium">© 2026 Nexus Monitoring Systems • Autonomous SOC Module</div>
             <div className="flex gap-4">
-              <button className="text-[10px] font-bold text-slate-400 hover:text-indigo-400 uppercase tracking-[0.2em] transition-colors">Documentation</button>
-              <button className="text-[10px] font-bold text-slate-400 hover:text-indigo-400 uppercase tracking-[0.2em] transition-colors">API Access</button>
-              <button className="text-[10px] font-bold text-slate-400 hover:text-indigo-400 uppercase tracking-[0.2em] transition-colors">System Logs</button>
+              <button className="text-[10px] font-bold text-slate-400 hover:text-slate-300 uppercase tracking-[0.2em] transition-colors">Documentation</button>
+              <button className="text-[10px] font-bold text-slate-400 hover:text-slate-300 uppercase tracking-[0.2em] transition-colors">API Access</button>
+              <button className="text-[10px] font-bold text-slate-400 hover:text-slate-300 uppercase tracking-[0.2em] transition-colors">System Logs</button>
             </div>
           </motion.div>
 
@@ -1278,7 +1328,6 @@ export default function DashboardPage() {
         </div>
       </main>
       
-      <SandboxSimulator isOpen={isSandboxOpen} onClose={() => setIsSandboxOpen(false)} />
 
       {/* DECISION SIMULATOR UI OVERLAY */}
       {simResult && (
@@ -1287,10 +1336,10 @@ export default function DashboardPage() {
             <div className="p-6 border-b border-slate-800 flex justify-between items-center">
               <div>
                 <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                  <Brain className="w-6 h-6 text-indigo-400" />
+                  <Brain className="w-6 h-6 text-slate-400" />
                   Decision Intelligence Preview
                 </h3>
-                <p className="text-slate-400 text-sm mt-1">Modeling consequences for: <span className="text-indigo-300 font-mono">{simResult.action}</span> on <span className="text-indigo-300 font-mono">{simResult.target}</span></p>
+                <p className="text-slate-400 text-sm mt-1">Modeling consequences for: <span className="text-slate-300 font-mono">{simResult.action}</span> on <span className="text-slate-300 font-mono">{simResult.target}</span></p>
               </div>
               <button onClick={() => setSimResult(null)} className="p-2 hover:bg-slate-800 rounded-lg transition-colors">
                 <X className="w-5 h-5 text-slate-400" />
@@ -1336,7 +1385,7 @@ export default function DashboardPage() {
 
               <div className="space-y-4">
                 <div className="bg-slate-950/30 p-4 rounded-xl border border-slate-800/50 flex gap-4">
-                  <div className="mt-1"><Info className="w-5 h-5 text-indigo-400" /></div>
+                  <div className="mt-1"><Info className="w-5 h-5 text-slate-400" /></div>
                   <div>
                     <h4 className="text-sm font-semibold text-slate-200">Primary Effect</h4>
                     <p className="text-slate-400 text-sm mt-1 leading-relaxed">{simResult.simulation.primary}</p>
@@ -1390,7 +1439,7 @@ export default function DashboardPage() {
                     if (type === 'control') alert('Action Queued successfully via BullMQ');
                   }
                 }}
-                className="px-8 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-500/20 transition-all font-bold flex items-center gap-2"
+                className="px-8 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white shadow-lg shadow-black/40 transition-all font-bold flex items-center gap-2 border border-slate-700/50"
               >
                 {simResult.type === 'incident' ? 'Confirm Remediation' : 'Confirm Execution'}
                 <ArrowRight className="w-4 h-4" />

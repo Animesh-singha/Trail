@@ -1,0 +1,14 @@
+{
+  "name": "nexus-agent",
+  "version": "1.0.0",
+  "description": "Lightweight discovery agent for Nexus Intelligence",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test:mock": "set SERVER_NAME=MOCK-VPS-NODE && set NEXUS_MOCK_MODE=true && node index.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1"
+  }
+}

@@ -74,10 +74,10 @@ The platform is built as a **Hub-and-Spoke** architecture:
 | **Backend** | Fastify (Node.js) | High-performance REST API server |
 | **Language** | TypeScript | Type safety for both frontend & backend |
 | **AI Engine** | Google Gemini 1.5 Pro | Root Cause Analysis & AI summaries |
+| **Security** | JWT + RBAC | Role-based access and action auditing |
+| **Real-time** | WebSockets | Instant bidirectional event streaming |
+| **Job Queue** | BullMQ & Redis | Asynchronous, resilient action execution |
 | **Database** | PostgreSQL | Stores incident history & audit logs |
-| **Metrics** | Prometheus | Stores time-series hardware metrics |
-| **Logs** | Loki + Promtail | Stores and streams application/server logs |
-| **Notifications** | Nodemailer / Discord Webhooks| Alerting pipelines |
 
 ---
 
@@ -125,14 +125,26 @@ ai-analyzer/
 │   └── services/
 │       ├── ai.service.ts     ← Calls Google Gemini API
 │       ├── db.service.ts     ← PostgreSQL queries
-│       ├── incident.service.ts ← Core alert processing pipeline
-│       ├── backup.service.ts ← pg_dump execution logic
-│       ├── control.service.ts← SSH command execution
-│       ├── notify.service.ts ← Email/Discord notification sender
-│       ├── security.service.ts ← SIEM threat detection patterns
-│       ├── automation.service.ts← Auto-remediation logic
-│       └── correlation.service.ts ← Log + Metric context gathering
+│       ├── event.service.ts  ← Manages WebSocket broadcasts
+│       ├── audit.service.ts  ← Administrative action logging
+│       ├── queue.service.ts  ← Manages BullMQ & Redis job processing
+│       ├── simulation.service.ts ← Predicts action impacts and risk scores
+│       ├── visibility.service.ts ← Maps relationships between domains, apps, and DBs
+│       ├── discovery.service.ts  ← The "Brain" that correlates agent port data
+│       └── ... (Automation, Control, Backup)
 └── .env
+
+### `agent/` — The Discovery Pulse
+A lightweight script deployed on your VPS fleet. It does NOT receive commands; it only PUSHES state to the Hub.
+
+```
+agent/
+├── collectors/
+│   ├── process.js   ← Scans ps -eo pid,args
+│   ├── ports.js     ← Scans ss -tulnp
+│   └── nginx.js     ← Parses /etc/nginx/sites-enabled/*
+└── index.js         ← Main heartbeat loop
+```
 ```
 
 ### `prometheus/`, `alertmanager/`, `blackbox/` — Monitoring Core
@@ -243,13 +255,68 @@ Standard industry-standard monitoring tools configured to scrape your servers an
 ### 📺 Live Errors Tab — Real-Time Log Terminal
 **What it does:** Shows a scrolling terminal-style view of the most recent error logs from your infrastructure.
 
-**How it works (Current - Mock):** Generates simulated error log lines via a `setInterval` loop in the browser.
+1. **WebSockets (Live Stream)**: The terminal maintains a persistent connection via `ws://v1/ws`.
+2. **Event Trigger**: When an alert fires or a log entry matches a pattern, the `eventHub` broadcasts to all connected dashboard instances.
+3. **AI Diagnostic**:
+   - Scans all loaded incidents.
+   - Automatically opens that incident's deep-dive modal.
 
-**How it works (Production):** Replace mock data with a real WebSocket or SSE stream. The backend continuously calls Loki's HTTP API to fetch the latest logs and pushes them to the frontend.
+---
 
-**Run AI Diagnostic Button:**
-- Scans all loaded incidents to find the most critical open one.
-- Automatically opens that incident's deep-dive modal where you can click "Explain with Gemini AI".
+### 🧠 Decision Simulator (Impact Preview)
+**What it does:** Predicts the operational impact, risk, and historical success rate of an action BEFORE it is executed.
+
+**How it works:**
+1. User clicks an action (e.g., "Restart Node").
+2. Frontend calls `POST /v1/control/simulate`.
+3. Backend `simulation.service.ts` combines static rules with `audit_logs` history.
+4. User sees an "Impact Preview" card with risk levels (LOW/MEDIUM/HIGH/CRITICAL).
+5. User must confirm execution after seeing the predicted consequences.
+
+**Files:** `services/simulation.service.ts`, `routes/control.route.ts`, `app/page.tsx` (SimResultUI)
+
+---
+
+### 🛰️ Real-time Discovery Engine
+**What it does:** Automatically maps your entire infrastructure (User ➔ Domain ➔ App ➔ Server) without manual configuration.
+
+**How it works:**
+1. **Agent Push**: The `nexus-agent` on each VPS sends a heartbeat with raw process and port data.
+2. **Correlation**: The backend `DiscoveryService` matches Nginx `proxy_pass` rules to local application ports.
+3. **Graphing**: The relationship is saved in the `topology_nodes` and `topology_edges` tables.
+4. **Visual Sync**: The dashboard's **Topology Map** renders the real-time graph.
+
+**Files:** `agent/index.js`, `services/discovery.service.ts`, `routes/agent.route.ts`, `components/InfrastructureTopology.tsx`
+
+---
+
+### 🏢 Business Service Layer
+**What it does:** Organizes raw technical nodes (apps, DBs, servers) into logical business units (e.g. "Auth Service", "Payment Flow").
+
+**How it works:**
+1. **Grouping**: Users can assign any topology node to a `Service`.
+2. **Health Aggregation**: The system calculates health scores at the service level based on member status.
+3. **API Access**: `/v1/services` allows for service CRUD and health monitoring.
+
+---
+
+### 🔴 Incident & Topology Linking
+**What it does:** Automatically visualizes "Impact Paths" when an incident is opened.
+
+**How it works:**
+1. **Open Incident**: When an incident is created, the system matches its `service` or `host` field to topology nodes.
+2. **Visual Highlight**: Impacted nodes are marked with `status: error` and enriched with incident IDs in the graph metadata.
+3. **Investigation**: Allows operators to see how a database failure propagates up through the proxy and app layers.
+
+---
+
+### ⏳ Timeline Replay (Snapshots)
+**What it does:** Records periodic snapshots of the entire infrastructure state for historical auditing and drift analysis.
+
+**How it works:**
+1. **Periodic Job**: Every discovery heartbeat triggers a full graph state capture.
+2. **Snapshot Storage**: State is saved as JSON in `topology_snapshots`.
+3. **Replay API**: `GET /v1/visibility/snapshots` fetches historical states.
 
 ---
 
@@ -298,10 +365,19 @@ USER SEES: Red incident card with AI summary and suggested fix
 | `GET` | `/v1/incidents/:id/timeline` | Get the root cause event timeline |
 | `PATCH` | `/v1/incidents/:id/status` | Update incident status (OPEN/RESOLVED) |
 | `POST` | `/v1/webhook` | Receive alerts from Alertmanager |
-| `POST` | `/v1/control/execute` | Execute a remote action on a server |
-| `POST` | `/v1/control/backup` | Trigger a pg_dump database backup |
-| `GET` | `/v1/control/history` | View past control action audit log |
-| `GET` | `/v1/metrics/uptime` | Fetch website uptime statuses |
+| `POST` | `/v1/control/execute` | Execute a remote action (Requires Admin RBAC) |
+| `POST` | `/v1/control/backup` | Trigger a pg_dump backup (Requires Admin RBAC) |
+| `POST` | `/v1/incidents/:id/approve` | **Approve & Execute Fix** (Human-in-the-loop) |
+| `POST` | `/v1/control/simulate` | Model generic action impact |
+| `POST` | `/v1/incidents/:id/simulate` | Model remediation impact |
+| `GET` | `/v1/visibility/topology` | Get full-stack relationship graph data |
+| `GET` | `/v1/visibility/apps/:server` | Get running processes & port mapping for a server |
+| `POST` | `/v1/agent/heartbeat` | Receive encrypted heartbeat from VPS agent |
+| `GET` | `/v1/agent/topology` | Fetch the full discovered relationship graph |
+| `GET` | `/v1/visibility/snapshots` | Fetch historical topology snapshots |
+| `GET` | `/v1/services` | List all business services & their health |
+| `POST` | `/v1/services` | Create a new logical business service |
+| `WS` | `/v1/ws` | Real-time incident & log event stream |
 
 ---
 
@@ -447,18 +523,18 @@ receivers:
 
 | Feature | Status | Priority |
 |---------|--------|----------|
-| Real pg_dump backup execution | ✅ Backend Complete | — |
-| Per-website Backup Panel UI | ✅ Complete | — |
-| Command Palette → Backend Execute | ✅ Complete | — |
-| Time Range Incident Filtering | ✅ Complete | — |
-| SLA Report CSV Export | ✅ Complete | — |
-| AI Diagnostic Button | ✅ Complete | — |
-| SSH-based Codebase Archive (Zip Webroot) | 🔜 Next | High |
-| WebSocket Real-time Log Streaming | 🔜 Planned | High |
-| Automatic Server Discovery via Cloud APIs | 🔜 Planned | Medium |
-| Mobile-responsive improvements | 🔜 Planned | Medium |
-| Role-based access control (Multi-user) | 🔜 Planned | Low |
-| Grafana Integration | 🔜 Planned | Low |
+| JWT + RBAC Security Lockdown | ✅ Complete | — |
+| WebSocket Real-time Streaming | ✅ Complete | — |
+| Human-in-the-loop AI Safety | ✅ Complete | — |
+| Decision Simulator (Impact Preview)| ✅ Complete | — |
+| BullMQ Asynchronous Pipeline | ✅ Complete | — |
+| Visibility & Topology Graph | ✅ Complete | — |
+| Real-time Discovery Engine | ✅ Complete | — |
+| Application Discovery (L2) | ✅ Complete | — |
+| Domain Routing (Nginx) | ✅ Complete | — |
+| Granular Permissions Matrix | ✅ Complete | — |
+| Agent-Based Logic | ✅ Complete | — |
+| Endpoint Performance Tracking | 🚧 Implementation Started | — |
 
 ---
 

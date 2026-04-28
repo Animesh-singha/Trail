@@ -1,0 +1,92 @@
+groups:
+  - name: nexus_alerts
+    rules:
+      # 1. CPU > 90%
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CRITICAL: CPU over 90% on {{ $labels.instance }}"
+          description: "Processor load is sustained at {{ $value }}%."
+
+      # 2. RAM > 90%
+      - alert: HighRAMUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 90
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CRITICAL: RAM exhaustion on {{ $labels.instance }}"
+          description: "Memory usage is at {{ $value }}%."
+
+      # 3. Disk > 85%
+      - alert: DiskFillingUp
+        expr: (node_filesystem_size_bytes{mountpoint="/"} - node_filesystem_avail_bytes{mountpoint="/"}) / node_filesystem_size_bytes{mountpoint="/"} * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "WARNING: Disk nearly full"
+          description: "Root partition is {{ $value }}% full."
+
+      # 4. Website Down
+      - alert: WebsiteDown
+        expr: probe_success == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CRITICAL: Website Offline"
+          description: "Target {{ $labels.instance }} is not responding to health checks."
+
+      # 5. SSL Expiring (< 15 days)
+      - alert: SSLCertExpiring
+        expr: probe_ssl_earliest_cert_expiry - time() < 86400 * 15
+        for: 1h
+        labels:
+          severity: warning
+        annotations:
+          summary: "WARNING: SSL Certificate Expiring"
+          description: "Certificate for {{ $labels.instance }} expires in less than 15 days."
+
+      # 6. 500 Errors Spike (> 5% of traffic)
+      - alert: HighErrorRate
+        expr: rate(nexus_http_requests_total{status=~"5.."}[5m]) / rate(nexus_http_requests_total[5m]) * 100 > 5
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CRITICAL: 500 Error Spike"
+          description: "Server is returning 500 errors for {{ $value }}% of requests."
+
+      # 7. SSH Brute Force (High failed login rate)
+      - alert: SSHBruteForceAttempt
+        expr: rate(node_auth_failures_total[5m]) > 0.1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "SECURITY: SSH Brute Force Detected"
+          description: "High rate of authentication failures detected on {{ $labels.instance }}."
+
+      # 8. Load Average High (> CPU Cores * 2)
+      - alert: HighLoadAverage
+        expr: node_load1 > 8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "WARNING: High System Load"
+          description: "System load average is {{ $value }} over the last minute."
+
+      # 9. Database Down
+      - alert: DatabaseOffline
+        expr: pg_up == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "CRITICAL: Database Offline"
+          description: "PostgreSQL instance is not responding."

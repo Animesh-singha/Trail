@@ -37,11 +37,8 @@ export default function ErrorStream() {
           }
         }
       } catch (err) {
-        // Sandbox fallback
-        setErrors([
-          { ts: Date.now().toString() + "000000", site: 'nexus-core-api.dev', msg: '[500] Internal Server Error: Connection pool exhausted.' },
-          { ts: (Date.now() - 5000).toString() + "000000", site: 'demo-bank.io', msg: '[ERROR] Payload validation failed for /api/v1/transfer' }
-        ]);
+        console.error('Error Stream Fetch Failure:', err);
+        setErrors([]); // We show no errors if the fetch fails
       } finally {
         setLoading(false);
       }
