@@ -76,14 +76,18 @@ export async function GET(req: NextRequest) {
     const dbStatus = dbData.data?.result?.[0]?.value?.[1] === '1' ? 'Healthy' : 'Down';
 
     // 5. Fetch Real PM2 Application Metrics (PM2 Exporter)
-    // We use 'or' logic to support both 'pm2_process_cpu' and 'pm2_cpu' naming styles
-    const pm2Res = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=pm2_cpu or pm2_process_cpu`);
-    const pm2MemRes = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=pm2_memory or pm2_process_memory`);
+    // We check every possible metric name to ensure discovery
+    const pm2Queries = [
+      'pm2_cpu', 'pm2_process_cpu', 'pm2_memory', 'pm2_process_memory', 'pm2_up'
+    ];
+    
+    const pm2Res = await fetch(`${PROMETHEUS_URL}/api/v1/query?query={__name__=~"pm2_.*cpu"}`);
+    const pm2MemRes = await fetch(`${PROMETHEUS_URL}/api/v1/query?query={__name__=~"pm2_.*memory"}`);
     const pm2Data = await pm2Res.json();
     const pm2MemData = await pm2MemRes.json();
     
     const apps = (pm2Data.data?.result || []).map((res: any, idx: number) => ({
-      name: res.metric.name || res.metric.instance || 'Unknown App',
+      name: res.metric.name || res.metric.item || res.metric.instance || 'Unknown App',
       cpu: parseFloat(res.value[1]).toFixed(1) + '%',
       memory: (parseFloat(pm2MemData.data?.result[idx]?.value[1] || 0) / 1024 / 1024).toFixed(1) + 'MB',
       status: 'active'

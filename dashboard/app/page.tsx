@@ -717,33 +717,59 @@ export default function DashboardPage() {
                             </tr>
                           </thead>
                           <tbody className="text-xs">
-                            {/* App Discovery auto-detects PM2 and Docker processes */}
-                            {apps.length > 0 ? (
-                              apps.map((app: any, i: number) => (
-                                <tr key={i} className="bg-slate-900/40 hover:bg-slate-900/60 transition-colors border-y border-slate-800/30">
-                                  <td className="px-4 py-3 font-bold text-indigo-100 flex items-center gap-3">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-                                    {app.name}
-                                  </td>
-                                  <td className="px-4 py-3 font-mono text-slate-400">N/A</td>
-                                  <td className="px-4 py-3 text-slate-500">ubuntu</td>
-                                  <td className="px-4 py-3 font-mono text-indigo-400">---</td>
-                                  <td className="px-4 py-3 text-slate-400">{app.cpu} / {app.memory}</td>
-                                  <td className="px-4 py-3 text-slate-500">online</td>
-                                  <td className="px-4 py-3 text-right">
-                                    <span className="text-[9px] font-black uppercase px-2 py-1 rounded-md border bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
-                                      {app.status}
-                                    </span>
-                                  </td>
-                                </tr>
-                              ))
-                            ) : (
-                              <tr>
-                                <td colSpan={7} className="px-4 py-8 text-center text-slate-500 italic">
-                                  Waiting for PM2 Discovery Agent to scan VPS processes...
-                                </td>
-                              </tr>
-                            )}
+                             {/* 1. Docker Containers Section */}
+                             <tr className="text-[10px] font-black text-indigo-400 uppercase tracking-widest bg-indigo-500/5">
+                               <td colSpan={7} className="px-4 py-2 border-b border-indigo-500/10">Discovered Docker Containers</td>
+                             </tr>
+                             {containers.map((container: any, i: number) => (
+                               <tr key={`cont-${i}`} className="bg-slate-900/40 hover:bg-slate-900/60 transition-colors border-y border-slate-800/30">
+                                 <td className="px-4 py-3 font-bold text-slate-100 flex items-center gap-3">
+                                   <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                                   {container.name.replace(/^\//, '')}
+                                 </td>
+                                 <td className="px-4 py-3 font-mono text-slate-500 text-[10px]">Docker</td>
+                                 <td className="px-4 py-3 text-slate-500">root</td>
+                                 <td className="px-4 py-3 font-mono text-indigo-400">---</td>
+                                 <td className="px-4 py-3 text-slate-400">N/A / {container.memory}</td>
+                                 <td className="px-4 py-3 text-slate-500">running</td>
+                                 <td className="px-4 py-3 text-right">
+                                   <span className="text-[9px] font-black uppercase px-2 py-1 rounded-md border bg-blue-500/10 text-blue-400 border-blue-500/20">
+                                     {container.status}
+                                   </span>
+                                 </td>
+                               </tr>
+                             ))}
+
+                             {/* 2. PM2 Processes Section */}
+                             <tr className="text-[10px] font-black text-emerald-400 uppercase tracking-widest bg-emerald-500/5">
+                               <td colSpan={7} className="px-4 py-2 border-b border-emerald-500/10 mt-4">Active PM2 Applications</td>
+                             </tr>
+                             {apps.length > 0 ? (
+                               apps.map((app: any, i: number) => (
+                                 <tr key={`app-${i}`} className="bg-slate-900/40 hover:bg-slate-900/60 transition-colors border-y border-slate-800/30">
+                                   <td className="px-4 py-3 font-bold text-indigo-100 flex items-center gap-3">
+                                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
+                                     {app.name}
+                                   </td>
+                                   <td className="px-4 py-3 font-mono text-slate-500 text-[10px]">PM2 Node</td>
+                                   <td className="px-4 py-3 text-slate-500">ubuntu</td>
+                                   <td className="px-4 py-3 font-mono text-indigo-400">---</td>
+                                   <td className="px-4 py-3 text-slate-400">{app.cpu} / {app.memory}</td>
+                                   <td className="px-4 py-3 text-slate-500">online</td>
+                                   <td className="px-4 py-3 text-right">
+                                     <span className="text-[9px] font-black uppercase px-2 py-1 rounded-md border bg-emerald-500/10 text-emerald-400 border-emerald-500/20">
+                                       {app.status}
+                                     </span>
+                                   </td>
+                                 </tr>
+                               ))
+                             ) : (
+                               <tr>
+                                 <td colSpan={7} className="px-4 py-8 text-center text-slate-500 italic">
+                                   {containers.length > 0 ? "Docker found, but still scanning for PM2 apps..." : "Searching for all VPS processes..."}
+                                 </td>
+                               </tr>
+                             )}
                           </tbody>
                         </table>
                       </div>
