@@ -8,5 +8,5 @@ ENV PM2_HOME=/root/.pm2
 
 EXPOSE 9209
 
-# Use the absolute system path to start the program
-CMD ["/usr/local/bin/pm2-metrics", "9209"]
+# Using the shell form (no brackets) to force it to run as a system tool
+CMD pm2-metrics 9209
