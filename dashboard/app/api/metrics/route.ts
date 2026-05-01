@@ -45,12 +45,17 @@ export async function GET(req: NextRequest) {
     const websites = results.map((res: any) => {
       const domain = res.metric.domain;
       const sslDays = parseInt(res.value[1]);
-      const latencyMatch = (latencyData.data?.result || []).find((l: any) => l.metric.instance.includes(domain));
+      
+      // Smart Match: Remove http:// and https:// and :9115 to find the latency
+      const latencyMatch = (latencyData.data?.result || []).find((l: any) => {
+        const cleanInstance = l.metric.instance.replace(/https?:\/\//, '').split(':')[0];
+        return cleanInstance.includes(domain) || domain.includes(cleanInstance);
+      });
       
       return {
         target: domain,
         status: sslDays > 0 ? 'online' : 'offline',
-        latency: latencyMatch ? `${Math.round(parseFloat(latencyMatch.value[1]))}ms` : 'N/A',
+        latency: latencyMatch ? `${Math.round(parseFloat(latencyMatch.value[1]))}ms` : '---',
         ssl_days: sslDays,
         vps: 'yoforex-main'
       };
@@ -76,22 +81,25 @@ export async function GET(req: NextRequest) {
     const dbStatus = dbData.data?.result?.[0]?.value?.[1] === '1' ? 'Healthy' : 'Down';
 
     // 5. Fetch Real PM2 Application Metrics (PM2 Exporter)
-    // We check every possible metric name to ensure discovery
-    const pm2Queries = [
-      'pm2_cpu', 'pm2_process_cpu', 'pm2_memory', 'pm2_process_memory', 'pm2_up'
-    ];
-    
-    const pm2Res = await fetch(`${PROMETHEUS_URL}/api/v1/query?query={__name__=~"pm2_.*cpu"}`);
-    const pm2MemRes = await fetch(`${PROMETHEUS_URL}/api/v1/query?query={__name__=~"pm2_.*memory"}`);
+    // We use the 'pm2_up' metric we just verified via curl
+    const pm2Res = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=pm2_up`);
     const pm2Data = await pm2Res.json();
-    const pm2MemData = await pm2MemRes.json();
     
-    const apps = (pm2Data.data?.result || []).map((res: any, idx: number) => ({
-      name: res.metric.name || res.metric.item || res.metric.instance || 'Unknown App',
-      cpu: parseFloat(res.value[1]).toFixed(1) + '%',
-      memory: (parseFloat(pm2MemData.data?.result[idx]?.value[1] || 0) / 1024 / 1024).toFixed(1) + 'MB',
-      status: 'active'
-    }));
+    // Also try to get CPU/Mem if they exist, otherwise fallback to 'N/A'
+    const pm2CpuRes = await fetch(`${PROMETHEUS_URL}/api/v1/query?query={__name__=~"pm2_.*cpu"}`);
+    const pm2CpuData = await pm2CpuRes.json();
+    
+    const apps = (pm2Data.data?.result || []).map((res: any, idx: number) => {
+      const appName = res.metric.name || res.metric.item || 'Unknown App';
+      const cpuMatch = (pm2CpuData.data?.result || []).find((c: any) => (c.metric.name || c.metric.item) === appName);
+      
+      return {
+        name: appName,
+        cpu: cpuMatch ? parseFloat(cpuMatch.value[1]).toFixed(1) + '%' : '0.0%',
+        memory: 'Monitoring',
+        status: res.value[1] === '1' ? 'active' : 'offline'
+      };
+    });
 
     if (target) {
         const single = websites.find((w: any) => w.target.includes(target.replace(/https?:\/\//, ''))) || websites[0];
