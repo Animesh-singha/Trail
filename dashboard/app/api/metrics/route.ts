@@ -36,11 +36,11 @@ export async function GET() {
     ]);
 
     // PARSE EVERYTHING
-    const [rps, errRate, avgLat, globalUptime, cpu, ram, disk, netIn, netOut, cpuHist, ssl, wLat, wUp, pm2, pm2R, pm2C, pm2M, alerts] = await Promise.all([
+    const [rps, errRate, avgLat, globalUptime, cpu, ram, disk, netIn, netOut, cpuHist, ssl, wLat, wUp, pm2, pm2R, pm2C, pm2M, alertsData] = await Promise.all([
       rpsRes.json(), errRes.json(), latRes.json(), upRes.json(),
       cpuRes.json(), ramRes.json(), diskRes.json(), netInRes.json(), netOutRes.json(), cpuHistRes.json(),
       sslRes.json(), websiteLatRes.json(), websiteUpRes.json(),
-      pm2Res.json(), pm2RestartsRes.json(), pm2CpuRes.json(), pm2MemRes.json(), alerts.json()
+      pm2Res.json(), pm2RestartsRes.json(), pm2CpuRes.json(), pm2MemRes.json(), alertsRes.json()
     ]);
 
     // 2. MAPPING WEBSITES (REAL DATA ONLY)
@@ -75,12 +75,12 @@ export async function GET() {
 
     return Response.json({
       global: {
-        status: (alerts.data?.alerts?.length || 0) > 0 ? 'DEGRADED' : 'HEALTHY',
+        status: (alertsData.data?.alerts?.length || 0) > 0 ? 'DEGRADED' : 'HEALTHY',
         rps: parseFloat(rps.data?.result?.[0]?.value?.[1] || '0').toFixed(1),
         error_rate: parseFloat(errRate.data?.result?.[0]?.value?.[1] || '0').toFixed(2),
         avg_latency: Math.round(parseFloat(avgLat.data?.result?.[0]?.value?.[1] || '0')),
         uptime: parseFloat(globalUptime.data?.result?.[0]?.value?.[1] || '0').toFixed(1),
-        active_alerts: alerts.data?.alerts?.length || 0
+        active_alerts: alertsData.data?.alerts?.length || 0
       },
       infra: {
         cpu: parseFloat(cpu.data?.result?.[0]?.value?.[1] || '0').toFixed(1),
@@ -92,7 +92,7 @@ export async function GET() {
       },
       websites,
       apps,
-      alerts: (alerts.data?.alerts || []).map((a: any) => ({
+      alerts: (alertsData.data?.alerts || []).map((a: any) => ({
         severity: a.labels.severity,
         message: a.annotations.summary || a.labels.alertname,
         time: a.activeAt
