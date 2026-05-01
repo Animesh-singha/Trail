@@ -7,59 +7,47 @@ export async function GET() {
     const now = Math.floor(Date.now() / 1000);
     const hourAgo = now - 3600;
 
-    // 1. SRE-GRADE QUERIES (RED MODEL)
+    // 1. FETCH ALL RAW TELEMETRY (PARALLEL)
     const [
-      rpsRes, errRes, p95Res, upRes, 
+      rpsRes, errRes, p95Res, sloRes, 
       cpuRes, ramRes, diskRes, netInRes, netOutRes, cpuHistRes,
-      sslRes, websiteLatRes, websiteUpRes,
-      pm2Res, pm2RestartsRes, pm2CpuRes, pm2MemRes,
+      sslRes, wLatRes, wUpRes,
+      pm2Res, pm2RRes, pm2CRes, pm2MRes,
       alertsRes
     ] = await Promise.all([
-      // RPS: Requests per second from the Counter
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=sum(rate(http_requests_total[5m]))`),
-      // Error %: (Errors / Total) * 100
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=sum(rate(http_errors_total[5m])) / sum(rate(http_requests_total[5m])) * 100`),
-      // p95 Latency: Quantile 0.95 from the Histogram
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) * 1000`),
-      // 24H SLO Compliance
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=avg_over_time(probe_success[24h]) * 100`),
-      
-      // Infra
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)`),
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100`),
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=(node_filesystem_size_bytes{mountpoint="/"} - node_filesystem_avail_bytes{mountpoint="/"}) / node_filesystem_size_bytes{mountpoint="/"} * 100`),
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=sum(rate(node_network_receive_bytes_total[5m]))`),
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=sum(rate(node_network_transmit_bytes_total[5m]))`),
       fetch(`${PROMETHEUS_URL}/api/v1/query_range?query=100 - (avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)&start=${hourAgo}&end=${now}&step=60s`),
-      
-      // Assets
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=probe_ssl_earliest_cert_expiry - time()`),
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=probe_duration_seconds * 1000`),
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=avg_over_time(probe_success[24h]) * 100`),
-      
-      // PM2
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=pm2_up`),
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=pm2_restarts`),
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=pm2_cpu`),
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=pm2_memory`),
-      
-      // Alerts
       fetch(`${PROMETHEUS_URL}/api/v1/alerts`)
     ]);
 
-    // PARSE EVERYTHING
+    // 2. PARSE ALL RESPONSES CORRECTLY
     const [rps, errRate, p95, slo, cpu, ram, disk, netIn, netOut, cpuHist, ssl, wLat, wUp, pm2, pm2R, pm2C, pm2M, alerts] = await Promise.all([
-      rps.json(), errRate.json(), p95.json(), slo.json(),
-      cpu.json(), ram.json(), disk.json(), netIn.json(), netOut.json(), cpuHist.json(),
-      ssl.json(), wLat.json(), wUp.json(),
-      pm2.json(), pm2R.json(), pm2C.json(), pm2M.json(), alerts.json()
+      rpsRes.json(), errRes.json(), p95Res.json(), sloRes.json(),
+      cpuRes.json(), ramRes.json(), diskRes.json(), netInRes.json(), netOutRes.json(), cpuHistRes.json(),
+      sslRes.json(), wLatRes.json(), wUpRes.json(),
+      pm2Res.json(), pm2RRes.json(), pm2CRes.json(), pm2MRes.json(), alertsRes.json()
     ]);
 
-    // DEBUG: HARVEST ALL LABELS
+    // DEBUG: HARVEST ALL LABELS (For final troubleshooting)
     console.log('DEBUG: PM2 RAW:', JSON.stringify(pm2.data?.result));
     console.log('DEBUG: SSL RAW:', JSON.stringify(ssl.data?.result));
 
-    // MAPPING WEBSITES
+    // 3. TRANSFORM DATA
     const websites = (ssl.data?.result || []).map((res: any) => {
       const domain = res.metric.domain || res.metric.instance || 'Unknown Host';
       const latMatch = (wLat.data?.result || []).find((l: any) => (l.metric.instance || '').includes(domain));
@@ -74,7 +62,6 @@ export async function GET() {
       };
     });
 
-    // MAPPING APPS
     const apps = (pm2.data?.result || []).map((res: any, idx: number) => {
       const name = res.metric.name || res.metric.app || res.metric.item || res.metric.instance || 'App';
       const cpuVal = (pm2C.data?.result || []).find((c: any) => (c.metric.name || c.metric.app || c.metric.item) === name);
