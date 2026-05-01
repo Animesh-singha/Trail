@@ -9,5 +9,5 @@ RUN npm install pm2-prometheus-exporter
 # The exporter runs on port 9209 by default
 EXPOSE 9209
 
-# Use the shell to find and run the exporter directly
-CMD ["sh", "-c", "node $(npm root)/pm2-prometheus-exporter/index.js || node $(npm root)/pm2-prometheus-exporter/bin/pm2-prometheus-exporter"]
+# This script finds ANY javascript file in the package and tries to run the right one
+CMD ["sh", "-c", "node $(find node_modules/pm2-prometheus-exporter -name 'index.js' | head -n 1) || node $(find node_modules/pm2-prometheus-exporter -name 'main.js' | head -n 1) || npx pm2-prometheus-exporter"]
