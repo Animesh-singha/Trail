@@ -5,6 +5,7 @@ import { Activity, Server, Globe, Boxes, ShieldCheck, AlertCircle } from 'lucide
 
 export default function SimpleDashboard() {
   const [data, setData] = useState<any>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
