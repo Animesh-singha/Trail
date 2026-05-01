@@ -150,9 +150,9 @@ services:
     networks:
       - nexus-net
 
-  # --- PM2 DISCOVERY AGENT (Official Stable Image) ---
+  # --- PM2 DISCOVERY AGENT (Official Original Image) ---
   pm2-exporter:
-    image: jshmrtn/pm2-prometheus-exporter:latest
+    image: saasquatch/pm2-prometheus-exporter:latest
     container_name: trail-pm2-exporter-1
     restart: unless-stopped
     pid: "host"
