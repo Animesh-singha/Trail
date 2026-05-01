@@ -7,62 +7,78 @@ export async function GET() {
     const now = Math.floor(Date.now() / 1000);
     const hourAgo = now - 3600;
 
-    // 1. FETCH ALL RAW TELEMETRY IN PARALLEL
+    // 1. SRE-GRADE QUERIES (RED MODEL)
     const [
-      rpsRes, errRes, latRes, upRes, 
+      rpsRes, errRes, p95Res, upRes, 
       cpuRes, ramRes, diskRes, netInRes, netOutRes, cpuHistRes,
       sslRes, websiteLatRes, websiteUpRes,
       pm2Res, pm2RestartsRes, pm2CpuRes, pm2MemRes,
       alertsRes
     ] = await Promise.all([
-      fetch(`${PROMETHEUS_URL}/api/v1/query?query=sum(rate(nginx_http_requests_total[5m]))`),
-      fetch(`${PROMETHEUS_URL}/api/v1/query?query=sum(rate(nginx_http_requests_total{status=~"5.."}[5m])) / sum(rate(nginx_http_requests_total[5m])) * 100`),
-      fetch(`${PROMETHEUS_URL}/api/v1/query?query=avg(probe_duration_seconds) * 1000`),
+      // RPS: Requests per second from the Counter
+      fetch(`${PROMETHEUS_URL}/api/v1/query?query=sum(rate(http_requests_total[5m]))`),
+      // Error %: (Errors / Total) * 100
+      fetch(`${PROMETHEUS_URL}/api/v1/query?query=sum(rate(http_errors_total[5m])) / sum(rate(http_requests_total[5m])) * 100`),
+      // p95 Latency: Quantile 0.95 from the Histogram
+      fetch(`${PROMETHEUS_URL}/api/v1/query?query=histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) * 1000`),
+      // 24H SLO Compliance
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=avg_over_time(probe_success[24h]) * 100`),
+      
+      // Infra
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)`),
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100`),
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=(node_filesystem_size_bytes{mountpoint="/"} - node_filesystem_avail_bytes{mountpoint="/"}) / node_filesystem_size_bytes{mountpoint="/"} * 100`),
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=sum(rate(node_network_receive_bytes_total[5m]))`),
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=sum(rate(node_network_transmit_bytes_total[5m]))`),
       fetch(`${PROMETHEUS_URL}/api/v1/query_range?query=100 - (avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)&start=${hourAgo}&end=${now}&step=60s`),
+      
+      // Assets
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=probe_ssl_earliest_cert_expiry - time()`),
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=probe_duration_seconds * 1000`),
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=avg_over_time(probe_success[24h]) * 100`),
+      
+      // PM2
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=pm2_up`),
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=pm2_restarts`),
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=pm2_cpu`),
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=pm2_memory`),
+      
+      // Alerts
       fetch(`${PROMETHEUS_URL}/api/v1/alerts`)
     ]);
 
     // PARSE EVERYTHING
-    const [rps, errRate, avgLat, globalUptime, cpu, ram, disk, netIn, netOut, cpuHist, ssl, wLat, wUp, pm2, pm2R, pm2C, pm2M, alertsData] = await Promise.all([
-      rpsRes.json(), errRes.json(), latRes.json(), upRes.json(),
-      cpuRes.json(), ramRes.json(), diskRes.json(), netInRes.json(), netOutRes.json(), cpuHistRes.json(),
-      sslRes.json(), websiteLatRes.json(), websiteUpRes.json(),
-      pm2Res.json(), pm2RestartsRes.json(), pm2CpuRes.json(), pm2MemRes.json(), alertsRes.json()
+    const [rps, errRate, p95, slo, cpu, ram, disk, netIn, netOut, cpuHist, ssl, wLat, wUp, pm2, pm2R, pm2C, pm2M, alerts] = await Promise.all([
+      rps.json(), errRate.json(), p95.json(), slo.json(),
+      cpu.json(), ram.json(), disk.json(), netIn.json(), netOut.json(), cpuHist.json(),
+      ssl.json(), wLat.json(), wUp.json(),
+      pm2.json(), pm2R.json(), pm2C.json(), pm2M.json(), alerts.json()
     ]);
 
-    // 2. MAPPING WEBSITES (REAL DATA ONLY)
+    // DEBUG: HARVEST ALL LABELS
+    console.log('DEBUG: PM2 RAW:', JSON.stringify(pm2.data?.result));
+    console.log('DEBUG: SSL RAW:', JSON.stringify(ssl.data?.result));
+
+    // MAPPING WEBSITES
     const websites = (ssl.data?.result || []).map((res: any) => {
-      const domain = res.metric.domain;
-      const latMatch = (wLat.data?.result || []).find((l: any) => l.metric.instance?.includes(domain));
-      const upMatch = (wUp.data?.result || []).find((u: any) => u.metric.instance?.includes(domain));
+      const domain = res.metric.domain || res.metric.instance || 'Unknown Host';
+      const latMatch = (wLat.data?.result || []).find((l: any) => (l.metric.instance || '').includes(domain));
+      const upMatch = (wUp.data?.result || []).find((u: any) => (u.metric.instance || '').includes(domain));
       
       return {
         domain,
         status: res.value[1] > 0 ? 'Up' : 'Down',
         latency: latMatch ? Math.round(parseFloat(latMatch.value[1])) + 'ms' : '---',
-        uptime: upMatch ? parseFloat(upMatch.value[1]).toFixed(1) + '%' : '100%',
+        uptime: upMatch ? parseFloat(upMatch.value[1]).toFixed(1) + '%' : '100.0%',
         ssl_days: Math.floor(res.value[1] / 86400)
       };
     });
 
-    // 3. MAPPING APPS (REAL DATA ONLY)
+    // MAPPING APPS
     const apps = (pm2.data?.result || []).map((res: any, idx: number) => {
-      const name = res.metric.name || res.metric.app || res.metric.item || 'App';
-      const cpuVal = (pm2C.data?.result || []).find((c: any) => (c.metric.name || c.metric.app) === name);
-      const memVal = (pm2M.data?.result || []).find((m: any) => (m.metric.name || m.metric.app) === name);
+      const name = res.metric.name || res.metric.app || res.metric.item || res.metric.instance || 'App';
+      const cpuVal = (pm2C.data?.result || []).find((c: any) => (c.metric.name || c.metric.app || c.metric.item) === name);
+      const memVal = (pm2M.data?.result || []).find((m: any) => (m.metric.name || m.metric.app || m.metric.item) === name);
       
       return {
         name,
@@ -75,12 +91,12 @@ export async function GET() {
 
     return Response.json({
       global: {
-        status: (alertsData.data?.alerts?.length || 0) > 0 ? 'DEGRADED' : 'HEALTHY',
+        status: (alerts.data?.alerts?.length || 0) > 0 ? 'DEGRADED' : 'HEALTHY',
         rps: parseFloat(rps.data?.result?.[0]?.value?.[1] || '0').toFixed(1),
         error_rate: parseFloat(errRate.data?.result?.[0]?.value?.[1] || '0').toFixed(2),
-        avg_latency: Math.round(parseFloat(avgLat.data?.result?.[0]?.value?.[1] || '0')),
-        uptime: parseFloat(globalUptime.data?.result?.[0]?.value?.[1] || '0').toFixed(1),
-        active_alerts: alertsData.data?.alerts?.length || 0
+        p95_latency: Math.round(parseFloat(p95.data?.result?.[0]?.value?.[1] || '0')),
+        slo: parseFloat(slo.data?.result?.[0]?.value?.[1] || '0').toFixed(1),
+        active_alerts: alerts.data?.alerts?.length || 0
       },
       infra: {
         cpu: parseFloat(cpu.data?.result?.[0]?.value?.[1] || '0').toFixed(1),
@@ -92,7 +108,7 @@ export async function GET() {
       },
       websites,
       apps,
-      alerts: (alertsData.data?.alerts || []).map((a: any) => ({
+      alerts: (alerts.data?.alerts || []).map((a: any) => ({
         severity: a.labels.severity,
         message: a.annotations.summary || a.labels.alertname,
         time: a.activeAt
