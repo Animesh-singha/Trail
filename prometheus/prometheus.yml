@@ -2,29 +2,32 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
-# Alerting rules configuration
 rule_files:
   - "rules.yml"
 
-# Alertmanager configuration
 alerting:
   alertmanagers:
     - static_configs:
         - targets:
-          - alertmanager:9093
+          - localhost:9093
 
 scrape_configs:
-  # 1. Monitor the VPS Infrastructure
   - job_name: 'node-exporter'
     static_configs:
-      - targets: ['node-exporter:9100']
+      - targets: ['localhost:9100']
 
-  # 2. Monitor the AI Hub (Nexus Hub)
-  - job_name: 'nexus-hub'
+  - job_name: 'pm2-exporter'
     static_configs:
-      - targets: ['nexus-hub:3111']
+      - targets: ['localhost:9209']
 
-  # 3. Monitor External Websites (Blackbox)
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['localhost:9113']
+
+  - job_name: 'postgres-exporter'
+    static_configs:
+      - targets: ['localhost:9187']
+
   - job_name: 'uptime-monitoring'
     metrics_path: /probe
     params:
@@ -38,17 +41,4 @@ scrape_configs:
       - source_labels: [__param_target]
         target_label: instance
       - target_label: __address__
-        replacement: blackbox-exporter:9115
-
-  # 5. Monitor Database (Postgres Exporter)
-  - job_name: 'postgres-exporter'
-    static_configs:
-      - targets: ['postgres-exporter:9187']
-
-  - job_name: 'pm2-exporter'
-    static_configs:
-      - targets: ['pm2-exporter:9209']
-
-  - job_name: 'nginx'
-    static_configs:
-      - targets: ['localhost:9113']
+        replacement: localhost:9115

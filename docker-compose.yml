@@ -25,6 +25,7 @@ services:
   prometheus:
     image: prom/prometheus:latest
     restart: unless-stopped
+    network_mode: host
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - ./prometheus/rules.yml:/etc/prometheus/rules.yml
@@ -32,10 +33,6 @@ services:
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
-    ports:
-      - "9090:9090"
-    networks:
-      - nexus-net
 
   alertmanager:
     image: prom/alertmanager:latest
@@ -144,8 +141,7 @@ services:
         - NEXT_PUBLIC_API_URL=http://37.187.159.136:3111
         - NEXT_PUBLIC_AI_HUB_URL=http://37.187.159.136:3111
     restart: unless-stopped
-    ports:
-      - "3200:3000" # Safe port mapped from 3000 to 3200
+    network_mode: host
     volumes:
       - ./dashboard:/app
       - /app/node_modules
@@ -153,10 +149,8 @@ services:
     environment:
       - NEXT_PUBLIC_API_URL=http://37.187.159.136:3111
       - NEXT_PUBLIC_AI_HUB_URL=http://37.187.159.136:3111
-      - NEXT_PUBLIC_PROMETHEUS_URL=http://37.187.159.136:9090
-      - PROMETHEUS_URL=http://prometheus:9090
-    networks:
-      - nexus-net
+      - NEXT_PUBLIC_PROMETHEUS_URL=http://localhost:9090
+      - PROMETHEUS_URL=http://localhost:9090
 
   # --- PM2 DISCOVERY AGENT (Self-Contained Local Build) ---
   pm2-exporter:
