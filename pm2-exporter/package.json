@@ -1,12 +1,11 @@
 {
   "name": "pm2-exporter",
   "version": "1.0.0",
-  "description": "PM2 Prometheus Exporter for Monitoring",
-  "main": "index.js",
+  "description": "PM2 Monitoring for Company Production",
   "dependencies": {
-    "pm2-prometheus-exporter": "latest"
+    "pm2-metrics": "latest"
   },
   "scripts": {
-    "start": "pm2-prometheus-exporter"
+    "start": "node node_modules/pm2-metrics/bin/pm2-metrics 9209"
   }
 }
