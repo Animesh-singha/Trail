@@ -9,5 +9,5 @@ RUN npm install pm2-prometheus-exporter
 # The exporter runs on port 9209 by default
 EXPOSE 9209
 
-# Use npx to automatically find and run the binary
-CMD ["npx", "pm2-prometheus-exporter"]
+# Use the shell to find and run the exporter directly
+CMD ["sh", "-c", "node $(npm root)/pm2-prometheus-exporter/index.js || node $(npm root)/pm2-prometheus-exporter/bin/pm2-prometheus-exporter"]
