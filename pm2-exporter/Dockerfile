@@ -1,13 +1,12 @@
 FROM node:18-bullseye-slim
 
-# Set working directory
-WORKDIR /app
+# Install pm2-metrics globally
+RUN npm install -g pm2-metrics
 
-# Install the Prometheus Exporter locally
-RUN npm install pm2-prometheus-exporter
+# Set environment for PM2 access
+ENV PM2_HOME=/root/.pm2
 
-# The exporter runs on port 9209 by default
 EXPOSE 9209
 
-# This script finds ANY javascript file in the package and tries to run the right one
-CMD ["sh", "-c", "node $(find node_modules/pm2-prometheus-exporter -name 'index.js' | head -n 1) || node $(find node_modules/pm2-prometheus-exporter -name 'main.js' | head -n 1) || npx pm2-prometheus-exporter"]
+# Run the exporter
+CMD ["pm2-metrics", "9209"]
