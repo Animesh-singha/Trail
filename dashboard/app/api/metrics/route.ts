@@ -1,136 +1,96 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
-export async function GET(req: NextRequest) {
-  const url = new URL(req.url);
-  const target = url.searchParams.get('target');
-  const PROMETHEUS_URL = process.env.PROMETHEUS_URL || 'http://prometheus:9090';
+const PROMETHEUS_URL = process.env.PROMETHEUS_URL || 'http://prometheus:9090';
 
+export async function GET() {
   try {
-    // 1. Fetch Real Server Metrics from Node Exporter
-    const cpuRes = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[1m])) * 100)`);
-    const memRes = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100`);
-    const diskRes = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=(1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) * 100`);
-    
-    const cpuData = await cpuRes.json();
-    const memData = await memRes.json();
-    const diskData = await diskRes.json();
+    const now = Math.floor(Date.now() / 1000);
+    const hourAgo = now - 3600;
 
-    const servers = (cpuData.data?.result || []).map((res: any, idx: number) => {
-      const memVal = memData.data?.result[idx]?.value[1] || '0';
-      const diskVal = diskData.data?.result[idx]?.value[1] || '0';
-      return {
-        hostname: res.metric.instance || 'Host',
-        ip: res.metric.instance.split(':')[0],
-        ram_used: Math.round(parseFloat(memVal)),
-        ram_total: 100,
-        cpu_load: Math.round(parseFloat(res.value[1])),
-        disk_used: Math.round(parseFloat(diskVal)),
-        disk_total: 100,
-        status: 'online'
-      };
-    });
+    // 1. GLOBAL SIGNALS & HISTORY (Last 1 Hour)
+    const [rpsRes, errRes, latRes, upRes, cpuHistRes] = await Promise.all([
+      fetch(`${PROMETHEUS_URL}/api/v1/query?query=sum(rate(nginx_http_requests_total[5m]))`),
+      fetch(`${PROMETHEUS_URL}/api/v1/query?query=sum(rate(nginx_http_requests_total{status=~"5.."}[5m])) / sum(rate(nginx_http_requests_total[5m])) * 100`),
+      fetch(`${PROMETHEUS_URL}/api/v1/query?query=avg(probe_duration_seconds) * 1000`),
+      fetch(`${PROMETHEUS_URL}/api/v1/query?query=avg_over_time(probe_success[24h]) * 100`),
+      fetch(`${PROMETHEUS_URL}/api/v1/query_range?query=100 - (avg(rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)&start=${hourAgo}&end=${now}&step=60s`)
+    ]);
 
-    // 2. Fetch Real Website Metrics from Blackbox Exporter
-    // 2. Fetch Network Probes (Latency)
-    const latencyRes = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=probe_duration_seconds * 1000`);
-    const latencyData = await latencyRes.json();
-    
-    // 3. Fetch Automated SSL Cert Data from Cert-Scan
-    const autoSslRes = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=ssl_certificate_expiry_days`);
-    const autoSslData = await autoSslRes.json();
+    const rps = await rpsRes.json();
+    const errRate = await errRes.json();
+    const avgLat = await latRes.json();
+    const uptime = await upRes.json();
+    const cpuHist = await cpuHistRes.json();
 
-    const results = autoSslData.data?.result || [];
-    
-    // Merge everything into monitored sites
-    const websites = results.map((res: any) => {
-      const domain = res.metric.domain;
-      const sslDays = parseInt(res.value[1]);
-      
-      // Smart Match: Remove http:// and https:// and :9115 to find the latency
-      const latencyMatch = (latencyData.data?.result || []).find((l: any) => {
-        const cleanInstance = l.metric.instance.replace(/https?:\/\//, '').split(':')[0];
-        return cleanInstance.includes(domain) || domain.includes(cleanInstance);
-      });
-      
-      return {
-        target: domain,
-        status: sslDays > 0 ? 'online' : 'offline',
-        latency: latencyMatch ? `${Math.round(parseFloat(latencyMatch.value[1]))}ms` : '---',
-        ssl_days: sslDays,
-        vps: 'yoforex-main'
-      };
-    });
+    // 2. INFRASTRUCTURE 
+    const [cpuRes, ramRes, diskRes, netInRes, netOutRes] = await Promise.all([
+      fetch(`${PROMETHEUS_URL}/api/v1/query?query=100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)`),
+      fetch(`${PROMETHEUS_URL}/api/v1/query?query=(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100`),
+      fetch(`${PROMETHEUS_URL}/api/v1/query?query=(node_filesystem_size_bytes{mountpoint="/"} - node_filesystem_avail_bytes{mountpoint="/"}) / node_filesystem_size_bytes{mountpoint="/"} * 100`),
+      fetch(`${PROMETHEUS_URL}/api/v1/query?query=sum(rate(node_network_receive_bytes_total[5m]))`),
+      fetch(`${PROMETHEUS_URL}/api/v1/query?query=sum(rate(node_network_transmit_bytes_total[5m]))`)
+    ]);
 
-    // Remove fallbacks: if there's no data, show no data so the user knows to fix the source.
-    if (websites.length === 0) {
-      console.warn("No website metrics discovered in Prometheus.");
-    }
+    const cpu = await cpuRes.json();
+    const ram = await ramRes.json();
+    const disk = await diskRes.json();
+    const netIn = await netInRes.json();
+    const netOut = await netOutRes.json();
 
-    // 3. Fetch Real Container Metrics (cAdvisor)
-    const containerRes = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=container_memory_usage_bytes{name!=""}`);
-    const containerData = await containerRes.json();
-    const containers = (containerData.data?.result || []).map((res: any) => ({
-      name: res.metric.name,
-      memory: (parseFloat(res.value[1]) / 1024 / 1024).toFixed(1) + 'MB',
-      status: 'running'
-    }));
-
-    // 4. Fetch Real Database Metrics (Postgres Exporter)
-    const dbRes = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=pg_up`);
-    const dbData = await dbRes.json();
-    const dbStatus = dbData.data?.result?.[0]?.value?.[1] === '1' ? 'Healthy' : 'Down';
-
-    // 5. Fetch Real PM2 Application Metrics (PM2 Exporter)
+    // 3. WEBSITES & PM2
+    const sslRes = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=probe_ssl_earliest_cert_expiry - time()`);
+    const sslData = await sslRes.json();
     const pm2Res = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=pm2_up`);
     const pm2Data = await pm2Res.json();
-    console.log('DEBUG: PM2 RAW DATA:', JSON.stringify(pm2Data.data?.result));
+    const pm2RestartsRes = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=pm2_restarts`);
+    const pm2RestartsData = await pm2RestartsRes.json();
 
-    const apps = (pm2Data.data?.result || []).map((res: any) => ({
-      name: res.metric.name || res.metric.item || 'Unknown App',
-      status: res.value[1] === '1' ? 'active' : 'offline'
-    }));
-
-    // 6. NEW: Fetch Real-Time Trends (Last 1 Hour)
-    const cpuTrendRes = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=avg_over_time(node_load1[1h])`);
-    const cpuTrendData = await cpuTrendRes.json();
-    const cpuTrend = parseFloat(cpuTrendData.data?.result?.[0]?.value?.[1] || '0').toFixed(2);
-
-    // 7. NEW: Fetch Active Alerts from Prometheus
+    // 4. ACTIVE ALERTS
     const alertsRes = await fetch(`${PROMETHEUS_URL}/api/v1/alerts`);
     const alertsData = await alertsRes.json();
-    console.log('DEBUG: ACTIVE ALERTS:', JSON.stringify(alertsData.data?.alerts));
 
-    const activeAlerts = (alertsData.data?.alerts || []).map((a: any) => ({
-      name: a.labels.alertname,
-      severity: a.labels.severity,
-      state: a.state,
-      summary: a.annotations.summary || a.annotations.description
+    // Transform CPU History for Sparkline
+    const cpuHistory = (cpuHist.data?.result?.[0]?.values || []).map((v: any) => parseFloat(v[1]));
+
+    const websites = (sslData.data?.result || []).map((res: any) => ({
+      domain: res.metric.domain,
+      status: res.value[1] > 0 ? 'Up' : 'Down',
+      ssl_days: Math.floor(res.value[1] / 86400)
     }));
 
-    // DEBUG: Latency matching
-    console.log('DEBUG: WEBSITES FOUND:', websites.length);
-    console.log('DEBUG: LATENCY RAW:', JSON.stringify(latencyData.data?.result?.slice(0, 2)));
+    const apps = (pm2Data.data?.result || []).map((res: any, idx: number) => ({
+      name: res.metric.name || 'App',
+      status: res.value[1] === '1' ? 'Running' : 'Crashed',
+      restarts: pm2RestartsData.data?.result?.[idx]?.value?.[1] || 0
+    }));
 
     return Response.json({
-      servers,
-      websites,
-      containers,
-      apps,
-      dbStatus,
-      trends: {
-        cpu_load: cpuTrend,
-        network_ingress: "1.2MB/s", 
-        network_egress: "0.8MB/s"
+      global: {
+        status: (alertsData.data?.alerts?.length || 0) > 0 ? 'DEGRADED' : 'HEALTHY',
+        rps: parseFloat(rps.data?.result?.[0]?.value?.[1] || '0').toFixed(1),
+        error_rate: parseFloat(errRate.data?.result?.[0]?.value?.[1] || '0').toFixed(2),
+        avg_latency: Math.round(parseFloat(avgLat.data?.result?.[0]?.value?.[1] || '0')),
+        uptime: parseFloat(uptime.data?.result?.[0]?.value?.[1] || '0').toFixed(1),
+        active_alerts: alertsData.data?.alerts?.length || 0
       },
-      alerts: activeAlerts
+      infra: {
+        cpu: parseFloat(cpu.data?.result?.[0]?.value?.[1] || '0').toFixed(1),
+        ram: parseFloat(ram.data?.result?.[0]?.value?.[1] || '0').toFixed(1),
+        disk: parseFloat(disk.data?.result?.[0]?.value?.[1] || '0').toFixed(1),
+        net_in: (parseFloat(netIn.data?.result?.[0]?.value?.[1] || '0') / 1024 / 1024).toFixed(2),
+        net_out: (parseFloat(netOut.data?.result?.[0]?.value?.[1] || '0') / 1024 / 1024).toFixed(2),
+        cpu_history: cpuHistory
+      },
+      websites,
+      apps,
+      alerts: (alertsData.data?.alerts || []).map((a: any) => ({
+        severity: a.labels.severity,
+        message: a.annotations.summary || a.labels.alertname
+      }))
     });
 
   } catch (error: any) {
     console.error('Metrics Retrieval Failed:', error.message);
-    return NextResponse.json({ 
-      error: 'Data Retrieval Failed', 
-      message: 'Connection to monitoring database failed. Showing no data to avoid false information.',
-      timestamp: new Date().toISOString()
-    }, { status: 503 });
+    return Response.json({ error: 'Data synchronization failure' }, { status: 500 });
   }
 }
