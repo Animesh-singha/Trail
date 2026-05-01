@@ -1,0 +1,12 @@
+{
+  "name": "pm2-exporter",
+  "version": "1.0.0",
+  "description": "PM2 Prometheus Exporter for Monitoring",
+  "main": "index.js",
+  "dependencies": {
+    "pm2-prometheus-exporter": "latest"
+  },
+  "scripts": {
+    "start": "pm2-prometheus-exporter"
+  }
+}

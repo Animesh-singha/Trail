@@ -150,9 +150,9 @@ services:
     networks:
       - nexus-net
 
-  # --- PM2 DISCOVERY AGENT (Most Popular Public Image) ---
+  # --- PM2 DISCOVERY AGENT (Self-Contained Local Build) ---
   pm2-exporter:
-    image: stefanprodan/pm2-exporter:latest
+    build: ./pm2-exporter
     container_name: trail-pm2-exporter-1
     restart: unless-stopped
     pid: "host"
