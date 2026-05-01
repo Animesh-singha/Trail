@@ -1,4 +1,4 @@
-FROM node:18-bullseye-slim
+FROM node:18-bullseye
 
 # Install pm2-metrics globally
 RUN npm install -g pm2-metrics
@@ -8,5 +8,5 @@ ENV PM2_HOME=/root/.pm2
 
 EXPOSE 9209
 
-# Using the shell form (no brackets) to force it to run as a system tool
-CMD pm2-metrics 9209
+# Run the exporter using its system name
+CMD ["pm2-metrics", "9209"]
