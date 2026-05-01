@@ -1,5 +1,5 @@
 services:
-  # --- SOC INTERNAL DATA STORE (Isolated from your real websites) ---
+  # --- SOC INTERNAL DATA STORE ---
   postgres:
     image: postgres:15-alpine
     restart: unless-stopped
@@ -14,14 +14,13 @@ services:
     networks:
       - nexus-net
 
-
   redis:
     image: redis:alpine
     restart: unless-stopped
     networks:
       - nexus-net
 
-  # --- MONITORING CORE LAYER ---
+  # --- MONITORING CORE LAYER (Host Mode for Raw Access) ---
   prometheus:
     image: prom/prometheus:latest
     restart: unless-stopped
@@ -37,16 +36,14 @@ services:
   alertmanager:
     image: prom/alertmanager:latest
     restart: unless-stopped
+    network_mode: host
     volumes:
       - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml
-    ports:
-      - "9093:9093"
-    networks:
-      - nexus-net
 
   node-exporter:
     image: prom/node-exporter:latest
     restart: unless-stopped
+    network_mode: host
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
@@ -57,48 +54,21 @@ services:
       - '--path.sysfs=/host/sys'
       - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($$|/)'
       - '--collector.textfile.directory=/etc/node-exporter'
-    ports:
-      - "9100:9100"
-    networks:
-      - nexus-net
 
   blackbox-exporter:
     image: prom/blackbox-exporter:latest
     restart: unless-stopped
+    network_mode: host
     volumes:
       - ./blackbox/blackbox.yml:/etc/blackbox_exporter/config.yml
-    ports:
-      - "9115:9115"
-    networks:
-      - nexus-net
 
-
-  # --- DATABASE METRICS (Real data for Postgres) ---
+  # --- DATABASE METRICS ---
   postgres-exporter:
     image: prometheuscommunity/postgres-exporter
     restart: unless-stopped
     environment:
-      - DATA_SOURCE_NAME=postgresql://nexus_user:YoForex@101@postgres:5432/nexus_db?sslmode=disable
-    ports:
-      - "9187:9187"
-    depends_on:
-      - postgres
-    networks:
-      - nexus-net
-
-  grafana:
-    image: grafana/grafana:latest
-    restart: unless-stopped
-    environment:
-      - GF_SECURITY_ADMIN_USER=singhaanimesh216@gmail.com
-      - GF_SECURITY_ADMIN_PASSWORD=1234qwer # Change this later via the Grafana UI (Profile -> Change Password)
-    ports:
-      - "3110:3000"
-    volumes:
-      - ./grafana/provisioning:/etc/grafana/provisioning
-      - grafana_data:/var/lib/grafana
-    networks:
-      - nexus-net
+      - DATA_SOURCE_NAME=postgresql://nexus_user:YoForex@101@localhost:5433/nexus_db?sslmode=disable
+    network_mode: host
 
   # --- INTELLIGENCE LAYER ---
   nexus-hub:
@@ -112,34 +82,25 @@ services:
       - /app/node_modules
     environment:
       - PORT=3111
-      - DB_HOST=postgres
+      - DB_HOST=localhost
       - DB_USER=nexus_user
       - DB_PASSWORD=YoForex@101
       - DB_NAME=nexus_db
-      - REDIS_URL=redis://redis:6379
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-    depends_on:
-      - postgres
-      - redis
-    networks:
-      - nexus-net
+      - REDIS_URL=redis://localhost:6379
+    network_mode: host
 
   # --- VISUALIZATION LAYER ---
   nginx-exporter:
     image: nginx/nginx-prometheus-exporter:latest
     container_name: trail-nginx-exporter
     command:
-      - -nginx.scrape-uri=http://host.docker.internal:80/nginx_status
+      - -nginx.scrape-uri=http://localhost:80/nginx_status
     network_mode: host
     restart: always
 
   nexus-dashboard:
     build:
       context: ./dashboard
-      args:
-        - NEXT_PUBLIC_API_URL=http://37.187.159.136:3111
-        - NEXT_PUBLIC_AI_HUB_URL=http://37.187.159.136:3111
     restart: unless-stopped
     network_mode: host
     volumes:
@@ -148,25 +109,22 @@ services:
       - /app/.next
     environment:
       - PORT=3200
-      - NEXT_PUBLIC_API_URL=http://37.187.159.136:3111
-      - NEXT_PUBLIC_AI_HUB_URL=http://37.187.159.136:3111
+      - NEXT_PUBLIC_API_URL=http://localhost:3111
+      - NEXT_PUBLIC_AI_HUB_URL=http://localhost:3111
       - NEXT_PUBLIC_PROMETHEUS_URL=http://localhost:9090
       - PROMETHEUS_URL=http://localhost:9090
 
-  # --- PM2 DISCOVERY AGENT (Self-Contained Local Build) ---
+  # --- PM2 DISCOVERY AGENT ---
   pm2-exporter:
     build: ./pm2-exporter
     container_name: trail-pm2-exporter-1
     restart: unless-stopped
+    network_mode: host
     pid: "host"
     environment:
       - PM2_HOME=/root/.pm2
-    ports:
-      - "9209:9209"
     volumes:
       - /home/ubuntu/.pm2:/root/.pm2:ro
-    networks:
-      - nexus-net
 
 networks:
   nexus-net:

@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 
-const PROMETHEUS_URL = process.env.PROMETHEUS_URL || 'http://prometheus:9090';
+const PROMETHEUS_URL = process.env.PROMETHEUS_URL || 'http://localhost:9090';
 
 export async function GET() {
   try {
     const now = Math.floor(Date.now() / 1000);
     const hourAgo = now - 3600;
 
-    // 1. FETCH ALL RAW TELEMETRY (PARALLEL)
+    // 1. FETCH SRE-GRADE DATA (PARALLEL)
     const [
       rpsRes, errRes, p95Res, sloRes, 
       cpuRes, ramRes, diskRes, netInRes, netOutRes, cpuHistRes,
@@ -15,9 +15,9 @@ export async function GET() {
       pm2Res, pm2RRes, pm2CRes, pm2MRes,
       alertsRes
     ] = await Promise.all([
-      fetch(`${PROMETHEUS_URL}/api/v1/query?query=sum(rate(http_requests_total[5m]))`),
-      fetch(`${PROMETHEUS_URL}/api/v1/query?query=sum(rate(http_errors_total[5m])) / sum(rate(http_requests_total[5m])) * 100`),
-      fetch(`${PROMETHEUS_URL}/api/v1/query?query=histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le)) * 1000`),
+      fetch(`${PROMETHEUS_URL}/api/v1/query?query=sum(rate(nginx_http_requests_total[5m]))`),
+      fetch(`${PROMETHEUS_URL}/api/v1/query?query=sum(rate(nginx_http_requests_total{status=~"5.."}[5m])) / sum(rate(nginx_http_requests_total[5m])) * 100`),
+      fetch(`${PROMETHEUS_URL}/api/v1/query?query=histogram_quantile(0.95, sum(rate(nginx_http_request_duration_seconds_bucket[5m])) by (le)) * 1000`),
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=avg_over_time(probe_success[24h]) * 100`),
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)`),
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100`),
@@ -35,7 +35,6 @@ export async function GET() {
       fetch(`${PROMETHEUS_URL}/api/v1/alerts`)
     ]);
 
-    // 2. PARSE ALL RESPONSES CORRECTLY
     const [rps, errRate, p95, slo, cpu, ram, disk, netIn, netOut, cpuHist, ssl, wLat, wUp, pm2, pm2R, pm2C, pm2M, alerts] = await Promise.all([
       rpsRes.json(), errRes.json(), p95Res.json(), sloRes.json(),
       cpuRes.json(), ramRes.json(), diskRes.json(), netInRes.json(), netOutRes.json(), cpuHistRes.json(),
@@ -43,18 +42,14 @@ export async function GET() {
       pm2Res.json(), pm2RRes.json(), pm2CRes.json(), pm2MRes.json(), alertsRes.json()
     ]);
 
-    // DEBUG: HARVEST ALL LABELS (For final troubleshooting)
-    console.log('DEBUG: PM2 RAW:', JSON.stringify(pm2.data?.result));
-    console.log('DEBUG: SSL RAW:', JSON.stringify(ssl.data?.result));
-
-    // 3. TRANSFORM DATA
+    // 2. MAPPING WEBSITES (REAL DOMAINS)
     const websites = (ssl.data?.result || []).map((res: any) => {
-      const domain = res.metric.domain || res.metric.instance || 'Unknown Host';
+      const domain = res.metric.instance || res.metric.domain || 'yoforex.net';
       const latMatch = (wLat.data?.result || []).find((l: any) => (l.metric.instance || '').includes(domain));
       const upMatch = (wUp.data?.result || []).find((u: any) => (u.metric.instance || '').includes(domain));
       
       return {
-        domain,
+        domain: domain.replace('https://', '').split(':')[0],
         status: res.value[1] > 0 ? 'Up' : 'Down',
         latency: latMatch ? Math.round(parseFloat(latMatch.value[1])) + 'ms' : '---',
         uptime: upMatch ? parseFloat(upMatch.value[1]).toFixed(1) + '%' : '100.0%',
@@ -62,17 +57,20 @@ export async function GET() {
       };
     });
 
-    const apps = (pm2.data?.result || []).map((res: any, idx: number) => {
-      const name = res.metric.name || res.metric.app || res.metric.item || res.metric.instance || 'App';
-      const cpuVal = (pm2C.data?.result || []).find((c: any) => (c.metric.name || c.metric.app || c.metric.item) === name);
-      const memVal = (pm2M.data?.result || []).find((m: any) => (m.metric.name || m.metric.app || m.metric.item) === name);
+    // 3. MAPPING APPS (DISCOVERED FROM PM2 DASHBOARD)
+    const apps = (pm2.data?.result || []).map((res: any) => {
+      // Use 'name' or 'app' label which pm2-exporter provides
+      const name = res.metric.name || res.metric.app || res.metric.instance || 'Unknown Bot';
+      const cpuVal = (pm2C.data?.result || []).find((c: any) => (c.metric.name === name || c.metric.app === name));
+      const memVal = (pm2M.data?.result || []).find((m: any) => (m.metric.name === name || m.metric.app === name));
+      const restVal = (pm2R.data?.result || []).find((r: any) => (r.metric.name === name || r.metric.app === name));
       
       return {
         name,
         status: res.value[1] === '1' ? 'Running' : 'Crashed',
-        restarts: pm2R.data?.result?.[idx]?.value?.[1] || 0,
-        cpu: cpuVal ? parseFloat(cpuVal.value[1]).toFixed(1) + '%' : '---',
-        memory: memVal ? (parseFloat(memVal.value[1]) / 1024 / 1024).toFixed(1) + 'MB' : '---'
+        restarts: restVal ? restVal.value[1] : 0,
+        cpu: cpuVal ? parseFloat(cpuVal.value[1]).toFixed(1) + '%' : '0.0%',
+        memory: memVal ? (parseFloat(memVal.value[1]) / 1024 / 1024).toFixed(1) + 'MB' : '0.0MB'
       };
     });
 
@@ -94,7 +92,7 @@ export async function GET() {
         cpu_history: (cpuHist.data?.result?.[0]?.values || []).map((v: any) => parseFloat(v[1]))
       },
       websites,
-      apps,
+      apps: apps.sort((a: any, b: any) => b.name.localeCompare(a.name)), // Sort for stability
       alerts: (alerts.data?.alerts || []).map((a: any) => ({
         severity: a.labels.severity,
         message: a.annotations.summary || a.labels.alertname,
