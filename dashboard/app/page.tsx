@@ -268,17 +268,17 @@ export default function DashboardPage() {
           }));
         }
 
-        // SYNC: Ensure if topology is empty, we fall back to /api/metrics for consistency
-        if (serversData.length === 0 || sitesData.length === 0) {
-          const res = await fetch('/api/metrics');
-          if (res.ok) {
-            const data = await res.json();
-            if (data.websites && sitesData.length === 0) sitesData = data.websites;
-            if (data.servers && serversData.length === 0) serversData = data.servers;
-            if (data.containers) setContainers(data.containers);
-            if (data.apps) setApps(data.apps);
-            if (data.dbStatus) setDbStatus(data.dbStatus);
-          }
+        // 3. Always fetch real-time PM2 and Container data from our metrics service
+        const metricsRes = await fetch('/api/metrics');
+        if (metricsRes.ok) {
+          const metricsData = await metricsRes.json();
+          if (metricsData.apps) setApps(metricsData.apps);
+          if (metricsData.containers) setContainers(metricsData.containers);
+          if (metricsData.dbStatus) setDbStatus(metricsData.dbStatus);
+          
+          // Fallback servers/sites if topology is empty
+          if (serversData.length === 0 && metricsData.servers) serversData = metricsData.servers;
+          if (sitesData.length === 0 && metricsData.websites) sitesData = metricsData.websites;
         }
 
         setServers(serversData);
@@ -584,7 +584,11 @@ export default function DashboardPage() {
                       <div className="glass-panel p-6 rounded-2xl">
                         <div className="flex justify-between items-center mb-6">
                           <span className="text-sm font-bold text-slate-300">Global Uptime Aggregate</span>
-                          <span className="text-emerald-400 font-black">99.98%</span>
+                          <span className="text-emerald-400 font-black">
+                            {monitoredSites.length > 0 
+                              ? (monitoredSites.filter(s => s.status === 'online').length / monitoredSites.length * 100).toFixed(2) 
+                              : '0.00'}%
+                          </span>
                         </div>
                         <div className="h-2 bg-slate-800 rounded-full overflow-hidden mb-8">
                           <div className="h-full w-[99.9%] bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.5)]"></div>

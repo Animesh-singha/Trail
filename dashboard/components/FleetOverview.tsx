@@ -74,8 +74,8 @@ export default function FleetOverview({ websites, servers, containers = [], dbSt
                        <div className="w-2 h-2 bg-rose-500 rounded-full animate-ping"></div>
                        Critical Hotspots Detected
                     </div>
-                    {criticalServers.map(s => (
-                      <div key={s.id} className="flex justify-between text-xs py-1">
+                    {criticalServers.map((s, sIdx) => (
+                      <div key={sIdx} className="flex justify-between text-xs py-1">
                          <span className="text-slate-300 font-mono">{s.hostname}</span>
                          <span className="text-rose-400 font-bold">{Math.round(s.cpu_load)}% CPU</span>
                       </div>
@@ -93,12 +93,16 @@ export default function FleetOverview({ websites, servers, containers = [], dbSt
                <div className="grid grid-cols-2 gap-4 mt-4">
                   <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-800">
                      <div className="text-[8px] text-slate-500 uppercase font-black mb-1">Avg Fleet Latency</div>
-                     <div className="text-sm font-bold text-slate-200">24ms</div>
+                     <div className="text-sm font-bold text-slate-200">
+                        {websites.length > 0 
+                          ? Math.round(websites.reduce((acc, w) => acc + (parseInt(w.latency) || 0), 0) / websites.length) 
+                          : 0}ms
+                     </div>
                   </div>
                   <div className="bg-slate-900/50 p-3 rounded-xl border border-slate-800">
-                     <div className="text-[8px] text-slate-500 uppercase font-black mb-1">Security Pulse</div>
-                     <div className={`text-[10px] font-bold ${sslSite ? 'text-emerald-400' : 'text-slate-500'}`}>
-                        {sslSite ? `SSL OK: ${sslSite.ssl_days}D` : 'SCANNING SSL...'}
+                     <div className="text-[8px] text-slate-500 uppercase font-black mb-1">Active Containers</div>
+                     <div className="text-sm font-bold text-indigo-400">
+                        {containers.length}
                      </div>
                   </div>
                </div>

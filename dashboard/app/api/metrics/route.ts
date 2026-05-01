@@ -56,15 +56,9 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    // Fallback if scan hasn't run yet
+    // Remove fallbacks: if there's no data, show no data so the user knows to fix the source.
     if (websites.length === 0) {
-      websites.push({
-        target: 'yoforex.net',
-        status: 'online',
-        latency: '112ms',
-        ssl_days: 63,
-        vps: 'yoforex-main'
-      });
+      console.warn("No website metrics discovered in Prometheus.");
     }
 
     // 3. Fetch Real Container Metrics (cAdvisor)
@@ -82,13 +76,14 @@ export async function GET(req: NextRequest) {
     const dbStatus = dbData.data?.result?.[0]?.value?.[1] === '1' ? 'Healthy' : 'Down';
 
     // 5. Fetch Real PM2 Application Metrics (PM2 Exporter)
-    const pm2Res = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=pm2_process_cpu`);
-    const pm2MemRes = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=pm2_process_memory`);
+    // We use 'or' logic to support both 'pm2_process_cpu' and 'pm2_cpu' naming styles
+    const pm2Res = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=pm2_cpu or pm2_process_cpu`);
+    const pm2MemRes = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=pm2_memory or pm2_process_memory`);
     const pm2Data = await pm2Res.json();
     const pm2MemData = await pm2MemRes.json();
     
     const apps = (pm2Data.data?.result || []).map((res: any, idx: number) => ({
-      name: res.metric.name || 'Unknown App',
+      name: res.metric.name || res.metric.instance || 'Unknown App',
       cpu: parseFloat(res.value[1]).toFixed(1) + '%',
       memory: (parseFloat(pm2MemData.data?.result[idx]?.value[1] || 0) / 1024 / 1024).toFixed(1) + 'MB',
       status: 'active'
