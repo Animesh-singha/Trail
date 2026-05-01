@@ -150,12 +150,12 @@ services:
     networks:
       - nexus-net
 
-  # --- PM2 DISCOVERY AGENT (Auto-detects your backend apps) ---
+  # --- PM2 DISCOVERY AGENT (Official Stable Image) ---
   pm2-exporter:
-    build: ./pm2-exporter
+    image: jshmrtn/pm2-prometheus-exporter:latest
     container_name: trail-pm2-exporter-1
     restart: unless-stopped
-    pid: "host" # Crucial: Allows seeing all host processes
+    pid: "host"
     environment:
       - PM2_HOME=/root/.pm2
     ports:
