@@ -83,6 +83,8 @@ export async function GET(req: NextRequest) {
     // 5. Fetch Real PM2 Application Metrics (PM2 Exporter)
     const pm2Res = await fetch(`${PROMETHEUS_URL}/api/v1/query?query=pm2_up`);
     const pm2Data = await pm2Res.json();
+    console.log('DEBUG: PM2 RAW DATA:', JSON.stringify(pm2Data.data?.result));
+
     const apps = (pm2Data.data?.result || []).map((res: any) => ({
       name: res.metric.name || res.metric.item || 'Unknown App',
       status: res.value[1] === '1' ? 'active' : 'offline'
@@ -96,12 +98,18 @@ export async function GET(req: NextRequest) {
     // 7. NEW: Fetch Active Alerts from Prometheus
     const alertsRes = await fetch(`${PROMETHEUS_URL}/api/v1/alerts`);
     const alertsData = await alertsRes.json();
+    console.log('DEBUG: ACTIVE ALERTS:', JSON.stringify(alertsData.data?.alerts));
+
     const activeAlerts = (alertsData.data?.alerts || []).map((a: any) => ({
       name: a.labels.alertname,
       severity: a.labels.severity,
       state: a.state,
       summary: a.annotations.summary || a.annotations.description
     }));
+
+    // DEBUG: Latency matching
+    console.log('DEBUG: WEBSITES FOUND:', websites.length);
+    console.log('DEBUG: LATENCY RAW:', JSON.stringify(latencyData.data?.result?.slice(0, 2)));
 
     return Response.json({
       servers,
@@ -111,7 +119,7 @@ export async function GET(req: NextRequest) {
       dbStatus,
       trends: {
         cpu_load: cpuTrend,
-        network_ingress: "1.2MB/s", // Future: calc from rate()
+        network_ingress: "1.2MB/s", 
         network_egress: "0.8MB/s"
       },
       alerts: activeAlerts
