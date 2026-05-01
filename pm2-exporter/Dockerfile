@@ -8,5 +8,5 @@ ENV PM2_HOME=/root/.pm2
 
 EXPOSE 9209
 
-# Run the exporter
-CMD ["pm2-metrics", "9209"]
+# Use the absolute system path to start the program
+CMD ["/usr/local/bin/pm2-metrics", "9209"]
