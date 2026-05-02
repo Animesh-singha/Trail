@@ -7,14 +7,14 @@ export async function GET() {
     const now = Math.floor(Date.now() / 1000);
     const hourAgo = now - 3600;
 
-    // 1. FETCH SRE-GRADE TELEMETRY (PARALLEL)
+    // 1. FETCH ENRICHED TELEMETRY
     const [
       rpsRes, errRes, p95Res, loadRes, 
       cpuRes, ramRes, diskRes, netInRes, netOutRes, cpuHistRes,
-      sslRes, wLatRes, wUpRes,
+      sslRes, wLatRes, wUpRes, wStatusRes,
       pm2Res, pm2RRes, pm2CRes, pm2MRes,
       sysCpuRes, sysMemRes, 
-      upstreamRes, alertsRes // Rename to alertsRes
+      upstreamRes, alertsRes
     ] = await Promise.all([
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=sum(rate(nginx_http_requests_total[5m]))`),
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=sum(rate(nginx_http_requests_total{status=~"5.."}[5m])) / sum(rate(nginx_http_requests_total[5m])) * 100`),
@@ -29,6 +29,7 @@ export async function GET() {
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=probe_ssl_earliest_cert_expiry - time()`),
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=probe_duration_seconds * 1000`),
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=avg_over_time(probe_success[24h]) * 100`),
+      fetch(`${PROMETHEUS_URL}/api/v1/query?query=probe_http_status_code`),
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=pm2_up`),
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=pm2_restarts`),
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=pm2_cpu`),
@@ -39,24 +40,33 @@ export async function GET() {
       fetch(`${PROMETHEUS_URL}/api/v1/alerts`)
     ]);
 
-    const [rps, errRate, p95, load, cpu, ram, disk, netIn, netOut, cpuHist, ssl, wLat, wUp, pm2, pm2R, pm2C, pm2M, sysCpu, sysMem, upstream, alertsData] = await Promise.all([
+    const [
+      rps, errRate, p95, load, cpu, ram, disk, netIn, netOut, cpuHist, ssl, wLat, wUp, wStatusCode,
+      pm2, pm2R, pm2C, pm2M, sysCpu, sysMem, upstream, alertsData
+    ] = await Promise.all([
       rpsRes.json(), errRes.json(), p95Res.json(), loadRes.json(),
       cpuRes.json(), ramRes.json(), diskRes.json(), netInRes.json(), netOutRes.json(), cpuHistRes.json(),
-      sslRes.json(), wLatRes.json(), wUpRes.json(),
+      sslRes.json(), wLatRes.json(), wUpRes.json(), wStatusRes.json(),
       pm2Res.json(), pm2RRes.json(), pm2CRes.json(), pm2MRes.json(), 
       sysCpuRes.json(), sysMemRes.json(), upstreamRes.json(), alertsRes.json()
     ]);
 
-    // WEBSITES
+    // WEBSITES (Smart Detection)
     const websites = (ssl.data?.result || []).map((res: any) => {
       const domain = res.metric.instance || res.metric.domain || 'yoforex.net';
       const latMatch = (wLat.data?.result || []).find((l: any) => (l.metric.instance || '').includes(domain));
       const upMatch = (wUp.data?.result || []).find((u: any) => (u.metric.instance || '').includes(domain));
+      const statusMatch = (wStatusCode.data?.result || []).find((s: any) => (s.metric.instance || '').includes(domain));
+      
+      const statusCode = statusMatch ? parseInt(statusMatch.value[1]) : 0;
+      const isUp = (upMatch && parseFloat(upMatch.value[1]) > 0) || (statusCode > 0 && statusCode < 500);
+
       const expirySeconds = parseFloat(res.value[1]);
       const expiryDays = Math.floor(expirySeconds / 86400);
+
       return {
         domain: domain.replace('https://', '').split(':')[0],
-        status: upMatch && parseFloat(upMatch.value[1]) > 0 ? 'Up' : 'Down',
+        status: isUp ? (statusCode === 200 ? 'Up' : `Alive (${statusCode})`) : 'Down',
         latency: latMatch ? Math.round(parseFloat(latMatch.value[1])) + 'ms' : '---',
         uptime: upMatch ? parseFloat(upMatch.value[1]).toFixed(1) + '%' : '100.0%',
         ssl_expiry: expiryDays > 0 ? `${expiryDays} Days` : 'EXPIRED',
@@ -94,7 +104,7 @@ export async function GET() {
 
     return Response.json({
       global: {
-        status: (alertsData.data?.alerts?.length || 0) > 0 ? 'DEGRADED' : 'HEALTHY',
+        status: (alertsData.data?.alerts || []).filter((a: any) => a.labels.severity === 'critical').length > 0 ? 'DEGRADED' : 'HEALTHY',
         rps: parseFloat(rps.data?.result?.[0]?.value?.[1] || '0').toFixed(1),
         error_rate: parseFloat(errRate.data?.result?.[0]?.value?.[1] || '0').toFixed(2),
         p95_latency: Math.round(parseFloat(p95.data?.result?.[0]?.value?.[1] || '0')),
