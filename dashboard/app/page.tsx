@@ -238,6 +238,43 @@ export default function SREDashboard() {
             </table>
           </div>
         </section>
+
+        {/* SECURITY & COMPLIANCE GRID (v7.0 Enhanced) */}
+        <section>
+          <div className="flex items-center gap-3 mb-4">
+            <Shield className="w-4 h-4 text-slate-500" />
+            <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Security & SSL Compliance</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+             {data?.websites?.map((site: any) => {
+               const days = parseInt(site.ssl_expiry);
+               const isCritical = days < 7 || site.ssl_expiry === 'EXPIRED';
+               const isWarning = days < 15;
+               
+               return (
+                 <div key={site.domain} className={`bg-[#0d0d0f] p-4 border rounded-xl transition-all group ${isCritical ? 'border-rose-500/50 bg-rose-500/[0.02]' : isWarning ? 'border-amber-500/30' : 'border-slate-800/50 hover:border-indigo-500/30'}`}>
+                   <div className="flex justify-between items-start mb-3">
+                      <div className="flex items-center gap-2">
+                         <div className={`w-1.5 h-1.5 rounded-full ${site.status === 'Up' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                         <span className="text-xs font-bold text-white truncate max-w-[120px]">{site.domain}</span>
+                      </div>
+                      <span className={`text-[9px] px-1.5 py-0.5 rounded border font-bold ${isCritical ? 'bg-rose-500/20 border-rose-500/40 text-rose-500' : isWarning ? 'bg-amber-500/20 border-amber-500/40 text-amber-400' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500'}`}>
+                        {site.status}
+                      </span>
+                   </div>
+                   <div className="flex justify-between items-center text-[10px] text-slate-500 font-mono mb-1">
+                      <span>SSL STATUS</span>
+                      <span>LATENCY</span>
+                   </div>
+                   <div className="flex justify-between items-center text-xs font-bold">
+                      <span className={isCritical ? 'text-rose-500' : isWarning ? 'text-amber-400' : 'text-emerald-500'}>{site.ssl_expiry}</span>
+                      <span className="text-indigo-400">{site.latency}</span>
+                   </div>
+                 </div>
+               );
+             })}
+          </div>
+        </section>
       </main>
 
       {/* FORENSIC SIDE DRAWER (v7.0 SIGNAL AWARE) */}
