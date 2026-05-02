@@ -101,6 +101,7 @@ services:
   nexus-dashboard:
     build:
       context: ./dashboard
+    user: "root" # FORCE ROOT: To fix 'Permission Denied' on logs
     restart: unless-stopped
     network_mode: host
     volumes:
@@ -120,6 +121,7 @@ services:
   pm2-exporter:
     build: ./pm2-exporter
     container_name: trail-pm2-exporter-1
+    user: "root" # FORCE ROOT: To fix permission issues
     restart: unless-stopped
     network_mode: host
     pid: "host"
