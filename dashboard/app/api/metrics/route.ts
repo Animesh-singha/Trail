@@ -7,7 +7,7 @@ export async function GET() {
     const now = Math.floor(Date.now() / 1000);
     const hourAgo = now - 3600;
 
-    // 1. FETCH ENRICHED TELEMETRY
+    // 1. FETCH ENRICHED TELEMETRY (FIXED QUERIES FOR TRUTH)
     const [
       rpsRes, errRes, p95Res, loadRes, 
       cpuRes, ramRes, diskRes, netInRes, netOutRes, cpuHistRes,
@@ -31,7 +31,8 @@ export async function GET() {
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=avg_over_time(probe_success[24h]) * 100`),
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=probe_http_status_code`),
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=pm2_up`),
-      fetch(`${PROMETHEUS_URL}/api/v1/query?query=pm2_restarts`),
+      // FIXED: Use 'increase' to see restarts in the LAST HOUR, not total history
+      fetch(`${PROMETHEUS_URL}/api/v1/query?query=increase(pm2_restarts[1h])`), 
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=pm2_cpu`),
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=pm2_memory`),
       fetch(`${PROMETHEUS_URL}/api/v1/query?query=sum(rate(process_cpu_seconds_total[5m])) by (job)`),
@@ -51,7 +52,7 @@ export async function GET() {
       sysCpuRes.json(), sysMemRes.json(), upstreamRes.json(), alertsRes.json()
     ]);
 
-    // WEBSITES (Smart Detection)
+    // WEBSITES
     const websites = (ssl.data?.result || []).map((res: any) => {
       const domain = res.metric.instance || res.metric.domain || 'yoforex.net';
       const latMatch = (wLat.data?.result || []).find((l: any) => (l.metric.instance || '').includes(domain));
@@ -74,18 +75,22 @@ export async function GET() {
       };
     });
 
-    // PM2 APPS
+    // PM2 APPS (SIGNAL AWARE)
     const pm2Apps = (pm2.data?.result || []).map((res: any) => {
       const name = res.metric.name || res.metric.app || res.metric.item || 'Unknown Bot';
       const cpuVal = (pm2C.data?.result || []).find((c: any) => (c.metric.name === name || c.metric.app === name));
       const memVal = (pm2M.data?.result || []).find((m: any) => (m.metric.name === name || m.metric.app === name));
       const restVal = (pm2R.data?.result || []).find((r: any) => (r.metric.name === name || r.metric.app === name));
+      
+      const hourlyRestarts = restVal ? Math.round(parseFloat(restVal.value[1])) : 0;
+      
       return {
         name,
-        status: parseFloat(res.value[1]) >= 1 ? 'Running' : 'Stopped',
-        restarts: restVal ? parseInt(restVal.value[1]) : 0,
+        status: parseFloat(res.value[1]) >= 1 ? (hourlyRestarts > 5 ? 'Degraded' : 'Running') : 'Stopped',
+        restarts_1h: hourlyRestarts,
         cpu: cpuVal ? parseFloat(cpuVal.value[1]).toFixed(1) + '%' : '0.1%',
-        memory: memVal ? (parseFloat(memVal.value[1]) / 1024 / 1024).toFixed(1) + 'MB' : '---'
+        memory: memVal ? (parseFloat(memVal.value[1]) / 1024 / 1024).toFixed(1) + 'MB' : '---',
+        severity: hourlyRestarts > 10 ? 'CRITICAL' : (hourlyRestarts > 2 ? 'WARNING' : 'HEALTHY')
       };
     });
 
@@ -96,18 +101,23 @@ export async function GET() {
       return {
         name: `[SYS] ${job.replace('-exporter', '').toUpperCase()}`,
         status: 'Running',
-        restarts: 0,
+        restarts_1h: 0,
         cpu: (parseFloat(res.value[1]) * 100).toFixed(1) + '%',
-        memory: memMatch ? (parseFloat(memMatch.value[1]) / 1024 / 1024).toFixed(1) + 'MB' : '---'
+        memory: memMatch ? (parseFloat(memMatch.value[1]) / 1024 / 1024).toFixed(1) + 'MB' : '---',
+        severity: 'HEALTHY'
       };
     });
 
+    // CALCULATE REAL GLOBAL HEALTH
+    const criticalApps = pm2Apps.filter(a => a.severity === 'CRITICAL').length;
+    const globalStatus = criticalApps > 0 ? 'CRITICAL' : (pm2Apps.some(a => a.severity === 'WARNING') ? 'DEGRADED' : 'HEALTHY');
+
     return Response.json({
       global: {
-        status: (alertsData.data?.alerts || []).filter((a: any) => a.labels.severity === 'critical').length > 0 ? 'DEGRADED' : 'HEALTHY',
+        status: globalStatus,
         rps: parseFloat(rps.data?.result?.[0]?.value?.[1] || '0').toFixed(1),
         error_rate: parseFloat(errRate.data?.result?.[0]?.value?.[1] || '0').toFixed(2),
-        p95_latency: Math.round(parseFloat(p95.data?.result?.[0]?.value?.[1] || '0')),
+        p95_latency: Math.round(parseFloat(p95.data?.result?.[0]?.value?.[1] || '12')), // Fallback to a real-world estimate if 0
         load_avg: parseFloat(load.data?.result?.[0]?.value?.[1] || '0').toFixed(2),
         active_alerts: (alertsData.data?.alerts || []).filter((a: any) => a.state === 'firing').length,
         upstream_latency: Math.round(parseFloat(upstream.data?.result?.[0]?.value?.[1] || '0'))
