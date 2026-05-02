@@ -115,12 +115,14 @@ export default function MissionControl() {
                               <td className="px-6 py-4 text-center text-xs text-blue-400">{app.memory}</td>
                               <td className="px-6 py-4 text-center text-xs text-slate-500">{app.restarts}</td>
                               <td className="px-6 py-4 text-right">
-                                 <button 
-                                   onClick={() => fetchLogs(app.name)}
-                                   className="text-[9px] font-black px-2 py-1 rounded bg-slate-800 hover:bg-indigo-600 text-white transition-all flex items-center gap-1 ml-auto"
-                                 >
+                                {!app.name.startsWith('[SYS]') && (
+                                  <button 
+                                    onClick={() => fetchLogs(app.name)}
+                                    className="text-[9px] font-black px-2 py-1 rounded bg-slate-800 hover:bg-indigo-600 text-white transition-all flex items-center gap-1 ml-auto"
+                                  >
                                     <Terminal size={10}/> LOGS
-                                 </button>
+                                  </button>
+                                )}
                               </td>
                            </tr>
                         ))}

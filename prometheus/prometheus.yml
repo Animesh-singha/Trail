@@ -35,14 +35,12 @@ scrape_configs:
 
   - job_name: 'uptime-monitoring'
     metrics_path: /probe
-    scrape_timeout: 10s # Increased from 5s to stop timeouts
+    scrape_timeout: 10s
     params:
       module: [http_2xx]
-    static_configs:
-      - targets:
-        - https://yoforex.net
-        - https://tradecopier.org
-        - https://yoforexai.com
+    file_sd_configs:
+      - files:
+        - '/etc/prometheus/targets.json' # DYNAMIC DISCOVERY: No more hardcoding
     relabel_configs:
       - source_labels: [__address__]
         target_label: __param_target

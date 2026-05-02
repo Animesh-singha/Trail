@@ -1,0 +1,36 @@
+[
+  {
+    "targets": [
+      "https://yoforex.net",
+      "https://yoforexai.com",
+      "https://tradecopier.org",
+      "https://admin.yoforexai.com",
+      "https://admin.yopips.com",
+      "https://admin4ea.yoforex.co.in",
+      "https://admin4reseller.yoforexea.com",
+      "https://alfx.forexfactory.cc",
+      "https://api.yoforex.co.in",
+      "https://app.tradecopier.org",
+      "https://app.yoforexai.com",
+      "https://backend.alfx.io",
+      "https://backend.yoforexai.com",
+      "https://backend.yopips.com",
+      "https://flexymarkets.com",
+      "https://funded.alfx.io",
+      "https://hrms.yoforex.net",
+      "https://mt5api.yoforex.co.in",
+      "https://orrnn.com",
+      "https://propadmin.alfx.io",
+      "https://reseller.yoforexea.com",
+      "https://rtx5.orrnn.com",
+      "https://superadmin.yoforex.co.in",
+      "https://superbackend.yoforex.co.in",
+      "https://user.yopips.com",
+      "https://yopips.com"
+    ],
+    "labels": {
+      "fleet": "yoforex-production",
+      "region": "europe"
+    }
+  }
+]
