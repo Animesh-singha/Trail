@@ -105,9 +105,6 @@ services:
     restart: unless-stopped
     network_mode: host
     volumes:
-      - ./dashboard:/app
-      - /app/node_modules
-      - /app/.next
       - /home/ubuntu/.pm2:/root/.pm2:ro # ADDED: Give Dashboard eyes to see bot logs
     environment:
       - PORT=3200

@@ -222,10 +222,10 @@ export default function MissionControl() {
 
       </main>
 
-      <footer className="max-w-[1600px] mx-auto p-12 text-center">
-         <p className="text-[10px] font-black text-slate-800 uppercase tracking-[1em]">
-            YoForex SRE Intelligence v6.0
-         </p>
+      <footer className="mt-12 pt-8 border-t border-slate-800/50 text-center">
+        <p className="text-[10px] uppercase tracking-[0.3em] text-slate-600 font-medium">
+          YOFOREX SRE INTELLIGENCE :: v6.2.1
+        </p>
       </footer>
 
     </div>
