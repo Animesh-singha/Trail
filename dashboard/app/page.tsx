@@ -28,7 +28,8 @@ export default function MissionControl() {
   const fetchLogs = async (service: string) => {
     setLogs('⏳ Fetching forensic logs...');
     try {
-      const response = await fetch(`/api/logs?service=${encodeURIComponent(service)}`);
+      // Add a timestamp to bypass any 404 cache
+      const response = await fetch(`/api/logs?service=${encodeURIComponent(service)}&t=${Date.now()}`);
       if (!response.ok) {
         const errorData = await response.json();
         setLogs(`❌ Error: ${errorData.error || 'Unknown problem'}`);
