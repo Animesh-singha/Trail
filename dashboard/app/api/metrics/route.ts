@@ -112,12 +112,16 @@ export async function GET() {
       },
       websites,
       apps: [...pm2Apps, ...sysApps].sort((a: any, b: any) => b.name.localeCompare(a.name)),
-      alerts: (alertsData.data?.alerts || []).map((a: any) => ({
-        severity: a.labels.severity,
-        message: a.annotations.summary || a.labels.alertname,
-        time: a.activeAt,
-        status: a.state
-      }))
+      alerts: (alertsData.data?.alerts || []).map((a: any) => {
+        const instance = a.labels.instance || a.labels.name || '';
+        const cleanInstance = instance.replace('https://', '').split(':')[0];
+        return {
+          severity: a.labels.severity,
+          message: `${a.annotations.summary || a.labels.alertname}${cleanInstance ? ` [${cleanInstance}]` : ''}`,
+          time: a.activeAt,
+          status: a.state
+        };
+      })
     });
 
   } catch (error: any) {
