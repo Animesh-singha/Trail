@@ -17,8 +17,7 @@ services:
   redis:
     image: redis:alpine
     restart: unless-stopped
-    networks:
-      - nexus-net
+    network_mode: host # FIXED: Move to host mode for seamless Hub access
 
   # --- MONITORING CORE LAYER (Host Mode for Raw Access) ---
   prometheus:
@@ -107,12 +106,14 @@ services:
       - ./dashboard:/app
       - /app/node_modules
       - /app/.next
+      - /home/ubuntu/.pm2:/root/.pm2:ro # ADDED: Give Dashboard eyes to see bot logs
     environment:
       - PORT=3200
       - NEXT_PUBLIC_API_URL=http://localhost:3111
       - NEXT_PUBLIC_AI_HUB_URL=http://localhost:3111
       - NEXT_PUBLIC_PROMETHEUS_URL=http://localhost:9090
       - PROMETHEUS_URL=http://localhost:9090
+      - PM2_LOG_PATH=/root/.pm2/logs # Path inside container
 
   # --- PM2 DISCOVERY AGENT ---
   pm2-exporter:
