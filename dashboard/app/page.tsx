@@ -25,15 +25,19 @@ export default function MissionControl() {
     }
   };
 
-  const fetchLogs = async (name: string) => {
-    setSelectedBot(name);
-    setLogs(`📡 Establishing link to ${name} logs...`);
+  const fetchLogs = async (service: string) => {
+    setLogs('⏳ Fetching forensic logs...');
     try {
-      const res = await fetch(`/api/logs?service=${name}`);
-      const json = await res.json();
-      setLogs(json.content || json.error || 'No log data available.');
+      const response = await fetch(`/api/logs?service=${encodeURIComponent(service)}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        setLogs(`❌ Error: ${errorData.error || 'Unknown problem'}`);
+        return;
+      }
+      const data = await response.text();
+      setLogs(data || 'No logs found for this service.');
     } catch (err) {
-      setLogs('❌ Failed to fetch logs.');
+      setLogs('❌ Failed to connect to server log stream.');
     }
   };
 
