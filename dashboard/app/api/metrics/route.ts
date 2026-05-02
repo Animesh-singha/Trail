@@ -9,7 +9,7 @@ export async function GET() {
 
     // 1. FETCH SRE-GRADE DATA (PARALLEL)
     const [
-      rpsRes, errRes, p95Res, sloRes, 
+      rpsRes, errRes, p95Res, sloRes,
       cpuRes, ramRes, diskRes, netInRes, netOutRes, cpuHistRes,
       sslRes, wLatRes, wUpRes,
       pm2Res, pm2RRes, pm2CRes, pm2MRes,
@@ -47,7 +47,7 @@ export async function GET() {
       const domain = res.metric.instance || res.metric.domain || 'yoforex.net';
       const latMatch = (wLat.data?.result || []).find((l: any) => (l.metric.instance || '').includes(domain));
       const upMatch = (wUp.data?.result || []).find((u: any) => (u.metric.instance || '').includes(domain));
-      
+
       return {
         domain: domain.replace('https://', '').split(':')[0],
         status: res.value[1] > 0 ? 'Up' : 'Down',
@@ -64,7 +64,7 @@ export async function GET() {
       const cpuVal = (pm2C.data?.result || []).find((c: any) => (c.metric.name === name || c.metric.app === name));
       const memVal = (pm2M.data?.result || []).find((m: any) => (m.metric.name === name || m.metric.app === name));
       const restVal = (pm2R.data?.result || []).find((r: any) => (r.metric.name === name || r.metric.app === name));
-      
+
       return {
         name,
         status: res.value[1] === '1' ? 'Running' : 'Crashed',
