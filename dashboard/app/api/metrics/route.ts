@@ -108,9 +108,9 @@ export async function GET() {
       };
     });
 
-    // CALCULATE REAL GLOBAL HEALTH
-    const criticalApps = pm2Apps.filter(a => a.severity === 'CRITICAL').length;
-    const globalStatus = criticalApps > 0 ? 'CRITICAL' : (pm2Apps.some(a => a.severity === 'WARNING') ? 'DEGRADED' : 'HEALTHY');
+    // CALCULATE REAL GLOBAL HEALTH (v7.0 Fixed)
+    const criticalApps = pm2Apps.filter((a: any) => a.severity === 'CRITICAL').length;
+    const globalStatus = criticalApps > 0 ? 'CRITICAL' : (pm2Apps.some((a: any) => a.severity === 'WARNING') ? 'DEGRADED' : 'HEALTHY');
 
     return Response.json({
       global: {
